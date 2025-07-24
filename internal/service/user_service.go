@@ -91,3 +91,18 @@ func (s *userService) generateJWT(user *domain.User) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(s.jwtSecret))
 }
+
+// GetUserByID retrieves a single user by their ID.
+func (s *userService) GetUserByID(ctx context.Context, req *GetUserByIdRequest) (*GetUserByIdResponse, error) {
+	user, err := s.userRepo.GetUserByID(ctx, req.ID)
+	if err != nil {
+		return nil, err
+	}
+	return &GetUserByIdResponse{
+		User: user,
+	}, nil
+}
+
+func (s *userService) GetAllUsers(ctx context.Context, req GetAllUsersRequest) (*GetAllUsersResponse, error) { return nil,nil}
+func (s *userService) UpdateUser(ctx context.Context, req PutUserByIdRequest) (*PutUserByIdResponse, error){return nil,nil}
+func (s *userService) DeleteUser(ctx context.Context, req DeleteUserByIdRequest) (*DeleteUserByIdResponse, error){return nil,nil}
