@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"fmt"
 	"go_finance/internal/api/middleware"
 	"go_finance/internal/domain"
 	"go_finance/internal/repository"
@@ -97,8 +96,11 @@ func (s *userService) generateJWT(user *domain.User) (string, error) {
 // GetUserByID retrieves a single user by their ID.
 func (s *userService) GetUserByID(ctx context.Context, req *GetUserByIdRequest) (*GetUserByIdResponse, error) {
 
-	// user kontrol kısmı eklenecek!!!
-	fmt.Println("User_id :", ctx.Value(middleware.UserIDKey))
+	if ctx.Value(middleware.UserRoleKey) != "admin" {
+		if ctx.Value(middleware.UserIDKey) != req.ID {
+			return nil, errors.New("you dont have any access")
+		}
+	}
 
 	user, err := s.userRepo.GetUserByID(ctx, req.ID)
 	if err != nil {
@@ -111,6 +113,9 @@ func (s *userService) GetUserByID(ctx context.Context, req *GetUserByIdRequest) 
 }
 
 func (s *userService) GetAllUsers(ctx context.Context, req GetAllUsersRequest) (*GetAllUsersResponse, error) {
+	if ctx.Value(middleware.UserRoleKey) != "admin" {
+		return nil, errors.New("you dont have any access")
+	}
 	users, err := s.userRepo.GetAllUsers(ctx)
 	if err != nil {
 		return nil, err
@@ -121,8 +126,35 @@ func (s *userService) GetAllUsers(ctx context.Context, req GetAllUsersRequest) (
 	}, nil
 }
 func (s *userService) UpdateUser(ctx context.Context, req PutUserByIdRequest) (*PutUserByIdResponse, error) {
-	return nil, nil
+	if ctx.Value(middleware.UserRoleKey) != "admin" {
+		if ctx.Value(middleware.UserIDKey) != req.ID {
+			return nil, errors.New("you dont have any access")
+		}
+	}
+
+	user, err := s.userRepo.UpdateUserByID(ctx, req.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &PutUserByIdResponse{
+		User:    user,
+		Message: "User Updated Succesfully",
+	}, nil
 }
 func (s *userService) DeleteUser(ctx context.Context, req DeleteUserByIdRequest) (*DeleteUserByIdResponse, error) {
-	return nil, nil
+	if ctx.Value(middleware.UserRoleKey) != "admin" {
+		if ctx.Value(middleware.UserIDKey) != req.ID {
+			return nil, errors.New("you dont have any access")
+		}
+	}
+
+	_, err := s.userRepo.DeleteUserByID(ctx, req.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &DeleteUserByIdResponse{
+		Message: "User deleted successfully",
+	}, nil
 }

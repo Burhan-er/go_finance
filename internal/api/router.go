@@ -31,8 +31,8 @@ func NewRouter(authHandler *handler.AuthHandler, authMiddleware *mWare.AuthMiddl
 			r.Use(authMiddleware.RequireAuth)
 			r.Get("/", userHandler.ListUsers)       // GET /api/v1/users
 			r.Get("/{id}", userHandler.GetUserByID) // GET /api/v1/users/{id}
-			//r.Put("/{id}", userHandler.UpdateUser)    // PUT /api/v1/users/{id}
-			//r.Delete("/{id}", userHandler.DeleteUser) // DELETE /api/v1/users/{id}
+			r.Put("/{id}", userHandler.UpdateUser)    // PUT /api/v1/users/{id}
+			r.Delete("/{id}", userHandler.DeleteUser) // DELETE /api/v1/users/{id}
 		})
 
 		// r.Route("/transactions", func(r chi.Router) {
