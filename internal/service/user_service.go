@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
+	"go_finance/internal/api/middleware"
 	"go_finance/internal/domain"
 	"go_finance/internal/repository"
 	"log"
@@ -94,15 +96,33 @@ func (s *userService) generateJWT(user *domain.User) (string, error) {
 
 // GetUserByID retrieves a single user by their ID.
 func (s *userService) GetUserByID(ctx context.Context, req *GetUserByIdRequest) (*GetUserByIdResponse, error) {
+
+	// user kontrol kısmı eklenecek!!!
+	fmt.Println("User_id :", ctx.Value(middleware.UserIDKey))
+
 	user, err := s.userRepo.GetUserByID(ctx, req.ID)
 	if err != nil {
 		return nil, err
 	}
+
 	return &GetUserByIdResponse{
 		User: user,
 	}, nil
 }
 
-func (s *userService) GetAllUsers(ctx context.Context, req GetAllUsersRequest) (*GetAllUsersResponse, error) { return nil,nil}
-func (s *userService) UpdateUser(ctx context.Context, req PutUserByIdRequest) (*PutUserByIdResponse, error){return nil,nil}
-func (s *userService) DeleteUser(ctx context.Context, req DeleteUserByIdRequest) (*DeleteUserByIdResponse, error){return nil,nil}
+func (s *userService) GetAllUsers(ctx context.Context, req GetAllUsersRequest) (*GetAllUsersResponse, error) {
+	users, err := s.userRepo.GetAllUsers(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &GetAllUsersResponse{
+		Users: users,
+	}, nil
+}
+func (s *userService) UpdateUser(ctx context.Context, req PutUserByIdRequest) (*PutUserByIdResponse, error) {
+	return nil, nil
+}
+func (s *userService) DeleteUser(ctx context.Context, req DeleteUserByIdRequest) (*DeleteUserByIdResponse, error) {
+	return nil, nil
+}

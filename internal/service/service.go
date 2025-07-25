@@ -37,7 +37,7 @@ type GetAllUsersResponse struct {
 }
 
 type GetUserByIdRequest struct {
-	ID string `json:"id"`
+	ID string
 }
 
 type GetUserByIdResponse struct {

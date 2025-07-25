@@ -10,7 +10,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-func NewRouter(authHandler *handler.AuthHandler, authMiddleware *mWare.AuthMiddleware,userHandler *handler.UserHandler) http.Handler {
+func NewRouter(authHandler *handler.AuthHandler, authMiddleware *mWare.AuthMiddleware, userHandler *handler.UserHandler) http.Handler {
 	r := chi.NewRouter()
 
 	// Temel middleware'ler
@@ -29,10 +29,10 @@ func NewRouter(authHandler *handler.AuthHandler, authMiddleware *mWare.AuthMiddl
 
 		r.Route("/users", func(r chi.Router) {
 			r.Use(authMiddleware.RequireAuth)
-			// r.Get("/", handler.UserHandler.ListUsers)         // GET /api/v1/users
-			r.Get("/{id}", userHandler.GetUserByID)   // GET /api/v1/users/{id}
-			// r.Put("/{id}", userHandler.UpdateUser)    // PUT /api/v1/users/{id}
-			// r.Delete("/{id}", userHandler.DeleteUser) // DELETE /api/v1/users/{id}
+			r.Get("/", userHandler.ListUsers)       // GET /api/v1/users
+			r.Get("/{id}", userHandler.GetUserByID) // GET /api/v1/users/{id}
+			//r.Put("/{id}", userHandler.UpdateUser)    // PUT /api/v1/users/{id}
+			//r.Delete("/{id}", userHandler.DeleteUser) // DELETE /api/v1/users/{id}
 		})
 
 		// r.Route("/transactions", func(r chi.Router) {

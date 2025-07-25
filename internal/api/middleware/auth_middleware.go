@@ -14,8 +14,30 @@ type AuthMiddleware struct {
 	jwtSecret string
 }
 
-// contextKey is a custom type for context keys to avoid collisions
-type contextKey string
+type contextKey int
+
+const (
+    UserIDKey contextKey = iota
+    UserRoleKey 
+    UserEmailKey
+    UserExpKey  
+)
+
+// String metodu ekleyerek her key için özel string gösterimi tanımlayalım
+func (k contextKey) String() string {
+    switch k {
+    case UserIDKey:
+        return "user_id"
+    case UserRoleKey:
+        return "user_role"
+    case UserEmailKey:
+        return "user_email"
+    case UserExpKey:
+        return "user_exp"
+    default:
+        return "unknown"
+    }
+}
 
 func NewAuthMiddleware(secret string) *AuthMiddleware {
 	return &AuthMiddleware{
@@ -58,15 +80,18 @@ func (m *AuthMiddleware) RequireAuth(next http.Handler) http.Handler {
 			http.Error(w, "Invalid token", http.StatusUnauthorized)
 			return
 		}
+		
 		exp, ok := claims["exp"].(float64)
 		if !ok || int64(exp) < time.Now().Unix() {
 			http.Error(w, "Token expired", http.StatusUnauthorized)
+		}
+
 		// Claims'i context'e ekle
-		ctx := context.WithValue(r.Context(), contextKey("user_id"), claims["sub"])
-		ctx = context.WithValue(ctx, contextKey("user_role"), claims["role"])
-		ctx = context.WithValue(ctx, contextKey("user_email"), claims["email"])
-		ctx = context.WithValue(ctx, contextKey("exp"), claims["exp"])
+		ctx := context.WithValue(r.Context(), UserIDKey, claims["sub"])
+		ctx = context.WithValue(ctx, UserRoleKey, claims["role"])
+		ctx = context.WithValue(ctx, UserEmailKey, claims["email"])
+		ctx = context.WithValue(ctx, UserExpKey, claims["exp"])
 
 		next.ServeHTTP(w, r.WithContext(ctx))
-	}})
+	})
 }

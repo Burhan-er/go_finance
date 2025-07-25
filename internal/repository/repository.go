@@ -11,7 +11,7 @@ type UserRepository interface {
 	CreateUser(ctx context.Context, user *domain.User) error
 	GetUserByEmail(ctx context.Context, email string) (*domain.User, error)
 	GetUserByID(ctx context.Context, id string) (*domain.User, error)
-	GetAllUsers(ctx context.Context) ([]domain.User, error)
+	GetAllUsers(ctx context.Context) ([]*domain.User, error)
 }
 
 // TransactionRepository defines the methods for interacting with transaction data.

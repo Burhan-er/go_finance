@@ -75,7 +75,7 @@ func (r *userRepository) GetUserByID(ctx context.Context, id string) (*domain.Us
 }
 
 // GetAllUsers retrieves all users from the database.
-func (r *userRepository) GetAllUsers(ctx context.Context) ([]domain.User, error) {
+func (r *userRepository) GetAllUsers(ctx context.Context) ([]*domain.User, error) {
 	// Corrected SQL query (removed extra comma and WHERE clause)
 	query := `SELECT id, username, email, password_hash, role, created_at, updated_at FROM users`
 
@@ -86,18 +86,19 @@ func (r *userRepository) GetAllUsers(ctx context.Context) ([]domain.User, error)
 	}
 	defer rows.Close()
 
-	var users []domain.User
+	var users []*domain.User
 	// Loop through all the returned rows
 	for rows.Next() {
-		var user domain.User
-		if err := rows.Scan(
-			&user.ID, &user.Username, &user.Email, &user.PasswordHash,
-			&user.Role, &user.CreatedAt, &user.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		users = append(users, user)
-	}
+    user := &domain.User{} 
+    if err := rows.Scan(
+        &user.ID, &user.Username, &user.Email, &user.PasswordHash,
+        &user.Role, &user.CreatedAt, &user.UpdatedAt,
+    ); err != nil {
+        return nil, err
+    }
+    users = append(users, user)
+}
+
 
 	// Check for errors during row iteration
 	if err = rows.Err(); err != nil {
