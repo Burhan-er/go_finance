@@ -10,18 +10,21 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/shopspring/decimal"
 )
 
 type userService struct {
 	userRepo     repository.UserRepository
+	balanceRepo  repository.BalanceRepository
 	jwtSecret    string
 	jwtExpiresIn time.Duration
 }
 
 // NewUserService creates a new user service
-func NewUserService(repo repository.UserRepository, secret string, expiresIn time.Duration) *userService {
+func NewUserService(repo repository.UserRepository, balanceRepo repository.BalanceRepository, secret string, expiresIn time.Duration) *userService {
 	return &userService{
 		userRepo:     repo,
+		balanceRepo:  balanceRepo,
 		jwtSecret:    secret,
 		jwtExpiresIn: expiresIn,
 	}
@@ -47,6 +50,15 @@ func (s *userService) Register(ctx context.Context, req RegisterRequest) (*Regis
 	if err := s.userRepo.CreateUser(ctx, newUser); err != nil {
 		log.Printf("Error creating user in repo: %v", err)
 		return nil, errors.New("could not create user")
+	}
+
+	amount, _ := decimal.NewFromString("0.00")
+	if err := s.balanceRepo.CreateBalance(ctx, &domain.Balance{
+		UserID:        newUser.ID,
+		Amount:        amount,
+		LastUpdatedAt: time.Now(),
+	}); err != nil {
+		log.Printf("Error creating users Balance : %+v", err)
 	}
 
 	return &RegisterResponse{

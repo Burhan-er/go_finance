@@ -4,6 +4,8 @@ import (
 	"context"
 	"go_finance/internal/domain"
 	"time"
+
+	"github.com/shopspring/decimal"
 )
 
 // RegisterRequest struct for user registration
@@ -64,9 +66,11 @@ type DeleteUserByIdResponse struct {
 }
 
 type PostTransactionCreditRequest struct {
-	UserID      string `json:"user_id"`
-	Amount      int    `json:"amount"`
-	Description string `json:"description"`
+	ToUserID    string                 `json:"to_user_id"`
+	FromUserID  string                 `json:"from_user_id"`
+	Type        domain.TransactionType `json:"type"`
+	Amount      decimal.Decimal        `json:"amount"`
+	Description string                 `json:"description"`
 }
 
 type PostTransactionCreditResponse struct {
@@ -75,9 +79,11 @@ type PostTransactionCreditResponse struct {
 }
 
 type PostTransactionDebitRequest struct {
-	UserID      string `json:"user_id"`
-	Amount      int    `json:"amount"`
-	Description string `json:"description"`
+	ToUserID    string                 `json:"to_user_id"`
+	FromUserID  string                 `json:"from_user_id"`
+	Type        domain.TransactionType `json:"type"`
+	Amount      decimal.Decimal        `json:"amount"`
+	Description string                 `json:"description"`
 }
 
 type PostTransactionDebitResponse struct {
@@ -86,10 +92,10 @@ type PostTransactionDebitResponse struct {
 }
 
 type PostTransactionTransferRequest struct {
-	FromUserID  string `json:"from_user_id"`
-	ToUserID    string `json:"to_user_id"`
-	Amount      int    `json:"amount"`
-	Description string `json:"description"`
+	FromUserID  string          `json:"from_user_id"`
+	ToUserID    string          `json:"to_user_id"`
+	Amount      decimal.Decimal `json:"amount"`
+	Description string          `json:"description"`
 }
 
 type PostTransactionTransferResponse struct {
@@ -98,7 +104,8 @@ type PostTransactionTransferResponse struct {
 }
 
 type GetTransactionHistoryRequest struct {
-	UserID string `json:"user_id"`
+	Page  int `json:"page"`
+	Limit int `json:"limit"`
 }
 
 type GetTransactionHistoryResponse struct {
@@ -106,7 +113,7 @@ type GetTransactionHistoryResponse struct {
 }
 
 type GetTransactionByIdRequest struct {
-	ID string `json:"id"`
+	ID string
 }
 
 type GetTransactionByIdResponse struct {
@@ -114,7 +121,8 @@ type GetTransactionByIdResponse struct {
 }
 
 type GetBalanceHistoricalRequest struct {
-	UserID string `json:"user_id"`
+	Page  int `json:"page"`
+	Limit int `json:"limit"`
 }
 
 type GetBalanceHistoricalResponse struct {
@@ -123,7 +131,7 @@ type GetBalanceHistoricalResponse struct {
 }
 
 type GetBalanceCurrentRequest struct {
-	UserID string `json:"user_id"`
+	UserID string
 }
 
 type GetBalanceCurrentResponse struct {
@@ -131,8 +139,7 @@ type GetBalanceCurrentResponse struct {
 }
 
 type GetBalanceAtTimeRequest struct {
-	UserID string    `json:"user_id"`
-	Time   time.Time `json:"time"`
+	Timestamp time.Time
 }
 
 type GetBalanceAtTimeResponse struct {
@@ -151,16 +158,16 @@ type UserService interface {
 
 // TransactionService defines the interface for transaction-related business logic
 type TransactionService interface {
-	CreditTransaction(ctx context.Context, req PostTransactionCreditRequest) (*PostTransactionCreditResponse, error)
-	DebitTransaction(ctx context.Context, req PostTransactionDebitRequest) (*PostTransactionDebitResponse, error)
-	TransferTransaction(ctx context.Context, req PostTransactionTransferRequest) (*PostTransactionTransferResponse, error)
-	GetTransactionHistory(ctx context.Context, req GetTransactionHistoryRequest) (*GetTransactionHistoryResponse, error)
-	GetTransactionByID(ctx context.Context, req GetTransactionByIdRequest) (*GetTransactionByIdResponse, error)
+	Credit(ctx context.Context, req PostTransactionCreditRequest) (*PostTransactionCreditResponse, error)
+	Debit(ctx context.Context, req PostTransactionDebitRequest) (*PostTransactionDebitResponse, error)
+	Transfer(ctx context.Context, req PostTransactionTransferRequest) (*PostTransactionTransferResponse, error)
+	GetHistory(ctx context.Context, req GetTransactionHistoryRequest) (*GetTransactionHistoryResponse, error)
+	GetByID(ctx context.Context, req GetTransactionByIdRequest) (*GetTransactionByIdResponse, error)
 }
 
 // BalanceService defines the interface for balance-related business logic
 type BalanceService interface {
-	GetCurrentBalance(ctx context.Context, req GetBalanceCurrentRequest) (*GetBalanceCurrentResponse, error)
-	GetHistoricalBalance(ctx context.Context, req GetBalanceHistoricalRequest) (*GetBalanceHistoricalResponse, error)
-	GetBalanceAtTime(ctx context.Context, req GetBalanceAtTimeRequest) (*GetBalanceAtTimeResponse, error)
+	GetCurrent(ctx context.Context, req GetBalanceCurrentRequest) (*GetBalanceCurrentResponse, error)
+	GetHistorical(ctx context.Context, req GetBalanceHistoricalRequest) (*GetBalanceHistoricalResponse, error)
+	GetAtTime(ctx context.Context, req GetBalanceAtTimeRequest) (*GetBalanceAtTimeResponse, error)
 }

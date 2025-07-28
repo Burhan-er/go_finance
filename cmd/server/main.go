@@ -32,17 +32,32 @@ func main() {
 	defer db.Close()
 	log.Println("Database connection established")
 
+	//Repo And Services
 	userRepo := postgres.NewUserRepository(db)
+	balanceRepo := postgres.NewBalanceRepository(db)
+	transactionRepo := postgres.NewTransactionRepository(db)
 
-	userService := service.NewUserService(userRepo, cfg.JWTSecret, cfg.JWTExpiresIn)
+	balanceService := service.NewBalanceService(balanceRepo)
+	userService := service.NewUserService(userRepo, balanceRepo,cfg.JWTSecret, cfg.JWTExpiresIn)
+	transactionService := service.NewTransactionService(transactionRepo, balanceRepo, db)
+
 	//Handler
 	userHandler := handler.NewUserHandler(userService)
 	authHandler := handler.NewAuthHandler(userService)
+	balanceHandler := handler.NewBalanceHandler(balanceService)
+	transactionHandler := handler.NewTransactionHandler(transactionService)
 
 	//MiddleWare
 	authMiddleware := middleware.NewAuthMiddleware(cfg.JWTSecret)
 
-	router := api.NewRouter(authHandler, authMiddleware, userHandler)
+	HandlerOfAll := api.Handlers{
+		Auth:        authHandler,
+		User:        userHandler,
+		Transaction: transactionHandler,
+		Balance:     balanceHandler,
+	}
+
+	router := api.NewRouter(authMiddleware, HandlerOfAll)
 
 	server := &http.Server{
 		Addr:    cfg.ServerAddr,

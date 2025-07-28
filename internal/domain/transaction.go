@@ -1,6 +1,10 @@
 package domain
 
-import "time"
+import (
+	"time"
+
+	"github.com/shopspring/decimal"
+)
 
 type TransactionType string
 
@@ -21,9 +25,11 @@ const (
 type Transaction struct {
 	ID          string          `json:"id"`
 	UserID      string          `json:"user_id"`
+	ToUserID    string          `json:"to_user_id"`
 	Type        TransactionType `json:"type"`
 	Status      StatusType      `json:"status"`
-	Amount      int             `json:"amount"`
+	Amount      decimal.Decimal `json:"amount"`
 	Description string          `json:"description"`
 	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
 }

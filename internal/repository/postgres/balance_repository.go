@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"go_finance/internal/domain"
 	"time"
+
+	"github.com/shopspring/decimal"
 )
 
 type balanceRepository struct {
@@ -42,7 +44,7 @@ func (r *balanceRepository) GetBalanceByUserID(ctx context.Context, userID strin
 
 // UpdateBalance updates a user's balance
 // This often happens within a database transaction to ensure atomicity
-func (r *balanceRepository) UpdateBalance(ctx context.Context, tx *sql.Tx, userID string, amount int) error {
+func (r *balanceRepository) UpdateBalance(ctx context.Context, tx *sql.Tx, userID string, amount decimal.Decimal) error {
 	query := `UPDATE balances SET amount = amount + $1, last_updated_at = $2 WHERE user_id = $3`
 
 	_, err := tx.ExecContext(ctx, query, amount, time.Now(), userID)
