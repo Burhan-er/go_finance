@@ -6,7 +6,7 @@ import (
 	"go_finance/internal/api/middleware"
 	"go_finance/internal/domain"
 	"go_finance/internal/repository"
-	"log"
+	"go_finance/pkg/utils"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -20,7 +20,6 @@ type userService struct {
 	jwtExpiresIn time.Duration
 }
 
-// NewUserService creates a new user service
 func NewUserService(repo repository.UserRepository, balanceRepo repository.BalanceRepository, secret string, expiresIn time.Duration) *userService {
 	return &userService{
 		userRepo:     repo,
@@ -31,7 +30,6 @@ func NewUserService(repo repository.UserRepository, balanceRepo repository.Balan
 }
 
 func (s *userService) Register(ctx context.Context, req RegisterRequest) (*RegisterResponse, error) {
-	// E-posta adresinin daha önce alınıp alınmadığını kontrol et
 	existing, _ := s.userRepo.GetUserByEmail(ctx, req.Email)
 	if existing != nil {
 		return nil, errors.New("email already taken")
@@ -43,12 +41,12 @@ func (s *userService) Register(ctx context.Context, req RegisterRequest) (*Regis
 	}
 
 	if err := newUser.HashPassword(req.Password); err != nil {
-		log.Printf("Error hashing password: %v", err)
+		utils.Logger.Error("Error hashing password", "error", err)
 		return nil, errors.New("could not process request")
 	}
 
 	if err := s.userRepo.CreateUser(ctx, newUser); err != nil {
-		log.Printf("Error creating user in repo: %v", err)
+		utils.Logger.Error("Error creating user in repository", "error", err)
 		return nil, errors.New("could not create user")
 	}
 
@@ -58,7 +56,7 @@ func (s *userService) Register(ctx context.Context, req RegisterRequest) (*Regis
 		Amount:        amount,
 		LastUpdatedAt: time.Now(),
 	}); err != nil {
-		log.Printf("Error creating users Balance : %+v", err)
+		utils.Logger.Error("Error creating user's balance", "error", err)
 	}
 
 	return &RegisterResponse{
@@ -70,7 +68,7 @@ func (s *userService) Register(ctx context.Context, req RegisterRequest) (*Regis
 func (s *userService) Login(ctx context.Context, req LoginRequest) (*LoginResponse, error) {
 	user, err := s.userRepo.GetUserByEmail(ctx, req.Email)
 	if err != nil {
-		log.Printf("User not found by email %s: %v", req.Email, err)
+		utils.Logger.Warn("User not found by email", "email", req.Email, "error", err)
 		return nil, errors.New("invalid credentials")
 	}
 
@@ -78,10 +76,9 @@ func (s *userService) Login(ctx context.Context, req LoginRequest) (*LoginRespon
 		return nil, errors.New("invalid credentials")
 	}
 
-	// JWT Oluştur
 	token, err := s.generateJWT(user)
 	if err != nil {
-		log.Printf("Could not generate JWT: %v", err)
+		utils.Logger.Error("Could not generate JWT", "error", err)
 		return nil, errors.New("could not process login")
 	}
 
@@ -105,7 +102,6 @@ func (s *userService) generateJWT(user *domain.User) (string, error) {
 	return token.SignedString([]byte(s.jwtSecret))
 }
 
-// GetUserByID retrieves a single user by their ID.
 func (s *userService) GetUserByID(ctx context.Context, req *GetUserByIdRequest) (*GetUserByIdResponse, error) {
 
 	if ctx.Value(middleware.UserRoleKey) != "admin" {

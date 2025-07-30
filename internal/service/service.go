@@ -8,7 +8,6 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// RegisterRequest struct for user registration
 type RegisterRequest struct {
 	Username string `json:"username"`
 	Email    string `json:"email"`
@@ -20,13 +19,11 @@ type RegisterResponse struct {
 	Message string       `json:"message"`
 }
 
-// LoginRequest struct for user login
 type LoginRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
-// LoginResponse struct contains tokens
 type LoginResponse struct {
 	User        *domain.User `json:"user"`
 	AccessToken string       `json:"access_token"`
@@ -104,8 +101,10 @@ type PostTransactionTransferResponse struct {
 }
 
 type GetTransactionHistoryRequest struct {
-	Page  int `json:"page"`
-	Limit int `json:"limit"`
+	UserID *string                 `json:"user_id"`
+	Type   *domain.TransactionType `json:"type"`
+	Offset *int                    `json:"page"`
+	Limit  *int                    `json:"limit"`
 }
 
 type GetTransactionHistoryResponse struct {
@@ -121,12 +120,12 @@ type GetTransactionByIdResponse struct {
 }
 
 type GetBalanceHistoricalRequest struct {
-	Page  int `json:"page"`
-	Limit int `json:"limit"`
+	UserID string `json:"user_id"`
+	StartDate   string`json:"start_date"`
+	EndDate string `json:"end_date"`
 }
 
 type GetBalanceHistoricalResponse struct {
-	UserID  string            `json:"user_id"`
 	History []*domain.Balance `json:"history"`
 }
 
@@ -146,7 +145,6 @@ type GetBalanceAtTimeResponse struct {
 	Balance *domain.Balance `json:"balance"`
 }
 
-// UserService defines the interface for user-related business logic
 type UserService interface {
 	Register(ctx context.Context, req RegisterRequest) (*RegisterResponse, error)
 	Login(ctx context.Context, req LoginRequest) (*LoginResponse, error)
@@ -156,7 +154,6 @@ type UserService interface {
 	DeleteUser(ctx context.Context, req DeleteUserByIdRequest) (*DeleteUserByIdResponse, error)
 }
 
-// TransactionService defines the interface for transaction-related business logic
 type TransactionService interface {
 	Credit(ctx context.Context, req PostTransactionCreditRequest) (*PostTransactionCreditResponse, error)
 	Debit(ctx context.Context, req PostTransactionDebitRequest) (*PostTransactionDebitResponse, error)
@@ -165,7 +162,6 @@ type TransactionService interface {
 	GetByID(ctx context.Context, req GetTransactionByIdRequest) (*GetTransactionByIdResponse, error)
 }
 
-// BalanceService defines the interface for balance-related business logic
 type BalanceService interface {
 	GetCurrent(ctx context.Context, req GetBalanceCurrentRequest) (*GetBalanceCurrentResponse, error)
 	GetHistorical(ctx context.Context, req GetBalanceHistoricalRequest) (*GetBalanceHistoricalResponse, error)

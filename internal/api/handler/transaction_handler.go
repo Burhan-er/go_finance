@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"go_finance/internal/domain"
 	"go_finance/internal/service"
 	"net/http"
 	"strconv"
@@ -18,7 +19,6 @@ func NewTransactionHandler(ts service.TransactionService) *TransactionHandler {
 	return &TransactionHandler{transactionService: ts}
 }
 
-// POST /api/v1/transactions/credit
 func (h *TransactionHandler) CreditTransaction(w http.ResponseWriter, r *http.Request) {
 
 	var req service.PostTransactionCreditRequest
@@ -28,7 +28,6 @@ func (h *TransactionHandler) CreditTransaction(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Servis katmanını çağır
 	transaction, err := h.transactionService.Credit(r.Context(), req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -40,7 +39,6 @@ func (h *TransactionHandler) CreditTransaction(w http.ResponseWriter, r *http.Re
 	json.NewEncoder(w).Encode(transaction)
 }
 
-// POST /api/v1/transactions/debit
 func (h *TransactionHandler) DebitTransaction(w http.ResponseWriter, r *http.Request) {
 	var req service.PostTransactionDebitRequest
 
@@ -60,7 +58,6 @@ func (h *TransactionHandler) DebitTransaction(w http.ResponseWriter, r *http.Req
 	json.NewEncoder(w).Encode(transaction)
 }
 
-// POST /api/v1/transactions/transfer
 func (h *TransactionHandler) TransferTransaction(w http.ResponseWriter, r *http.Request) {
 	var req service.PostTransactionTransferRequest
 
@@ -80,28 +77,44 @@ func (h *TransactionHandler) TransferTransaction(w http.ResponseWriter, r *http.
 	json.NewEncoder(w).Encode(result)
 }
 
-// GET /api/v1/transactions/history
+type StrConv struct {
+	IntValue    int
+	StringValue string
+}
+
 func (h *TransactionHandler) TransactionHistory(w http.ResponseWriter, r *http.Request) {
 
 	var req service.GetTransactionHistoryRequest
 
-	pageStr := r.URL.Query().Get("Page")
-	limitStr := r.URL.Query().Get("Limit")
+	userId := r.URL.Query().Get("user_id")
+	limitStr := r.URL.Query().Get("limit")
+	offsetStr := r.URL.Query().Get("offset")
+	ttype := r.URL.Query().Get("type")
 
-	page, pageConvertErr := strconv.Atoi(pageStr)
-	if pageConvertErr != nil {
-		http.Error(w, fmt.Sprintf("%s is not a Number", pageStr), http.StatusBadRequest)
-		return
+	var offset int
+	var offsetConvertErr error
+	if offsetStr != "" {
+		offset, offsetConvertErr = strconv.Atoi(offsetStr)
+		if offsetConvertErr != nil {
+			http.Error(w, fmt.Sprintf("%s is not a Number", offsetStr), http.StatusBadRequest)
+			return
+		}
+	}
+	var limit int
+	var limitConvertErr error
+	if limitStr != "" {
+		limit, limitConvertErr = strconv.Atoi(limitStr)
+		if limitConvertErr != nil {
+			http.Error(w, fmt.Sprintf("%s is not a Number", limitStr), http.StatusBadRequest)
+			return
+		}
 	}
 
-	limit, limitConvertError := strconv.Atoi(limitStr)
-	if limitConvertError != nil {
-		http.Error(w, fmt.Sprintf("%s is not a Number", limitStr), http.StatusBadRequest)
-		return
-	}
-
-	req.Page = page
-	req.Limit = limit
+	req.UserID = &userId
+	req.Offset = &offset
+	ttypeVal := domain.TransactionType(ttype)
+	req.Type = &ttypeVal
+	req.Limit = &limit
 
 	history, err := h.transactionService.GetHistory(r.Context(), req)
 	if err != nil {
@@ -114,7 +127,6 @@ func (h *TransactionHandler) TransactionHistory(w http.ResponseWriter, r *http.R
 	json.NewEncoder(w).Encode(history)
 }
 
-// GET /api/v1/transactions/{id}
 func (h *TransactionHandler) GetTransactionByID(w http.ResponseWriter, r *http.Request) {
 	var req service.GetTransactionByIdRequest
 

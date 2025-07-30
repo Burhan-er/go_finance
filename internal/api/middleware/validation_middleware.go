@@ -16,7 +16,6 @@ func NewValidationMiddleware() *ValidationMiddleware {
 	return &ValidationMiddleware{}
 }
 
-// ValidateJSON verilen yapıya göre JSON isteğini doğrular
 func (m *ValidationMiddleware) ValidateJSON(v interface{}) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -35,7 +34,6 @@ func (m *ValidationMiddleware) ValidateJSON(v interface{}) func(http.Handler) ht
 				return
 			}
 
-			// İsteği tekrar okuyabilmek için body'yi yeniden oluştur
 			r.Body = http.MaxBytesReader(w, r.Body, 1048576) // 1MB limit
 
 			next.ServeHTTP(w, r)
@@ -43,7 +41,6 @@ func (m *ValidationMiddleware) ValidateJSON(v interface{}) func(http.Handler) ht
 	}
 }
 
-// ValidateQueryParams query parametrelerini doğrular
 func (m *ValidationMiddleware) ValidateQueryParams(required ...string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

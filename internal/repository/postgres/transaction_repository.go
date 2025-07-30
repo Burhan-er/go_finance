@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"go_finance/internal/domain"
 	"time"
 )
@@ -11,70 +12,111 @@ type transactionRepository struct {
 	db *sql.DB
 }
 
-// NewTransactionRepository creates a new transaction repository
 func NewTransactionRepository(db *sql.DB) *transactionRepository {
 	return &transactionRepository{db: db}
 }
 
-// CreateTransaction creates a new transaction in the database
 func (r *transactionRepository) CreateTransaction(ctx context.Context, tx *sql.Tx, transaction *domain.Transaction) error {
 	query := `INSERT INTO transactions (from_user_id, to_user_id, type, status, amount, created_at)
-			  VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
+			  VALUES ($1, $2, $3, $4, $5, $6)`
 
 	transaction.CreatedAt = time.Now()
 	if transaction.Status == "" {
 		transaction.Status = domain.Pending
 	}
 
-	err := tx.QueryRowContext(ctx, query, transaction.UserID, transaction.ToUserID, transaction.Type, transaction.Status, transaction.Amount, transaction.CreatedAt).Scan(&transaction.ID)
+	_,err := tx.ExecContext(ctx, query, transaction.UserID, transaction.ToUserID, transaction.Type, transaction.Status, transaction.Amount, transaction.CreatedAt)
 	return err
 }
 
-// GetTransactionByID retrieves a single transaction by its ID
-func (r *transactionRepository) GetTransactionByID(ctx context.Context, id string) (*domain.Transaction, error) {
-	query := `SELECT id, from_user_id, to_user_id, type, status, amount, created_at FROM transactions WHERE id = $1`
+func (r *transactionRepository) GetTransactionsByUserID(ctx context.Context, id string, opts ...domain.TransactionQueryOption) ([]*domain.Transaction, error) {
+	limit := -1
+	offset := 0
+	var ttype domain.StatusType
+	var hasType bool
 
-	var transaction domain.Transaction
-	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&transaction.ID, &transaction.UserID, &transaction.ToUserID, &transaction.Type, &transaction.Status,
-		&transaction.Amount, &transaction.CreatedAt,
-	)
-	if err != nil {
-		return nil, err
+	for _, opt := range opts {
+		switch v := opt.(type) {
+		case domain.Limit:
+			limit = int(v)
+		case domain.Offset:
+			offset = int(v)
+		case domain.StatusType:
+			ttype = domain.StatusType(v)
+			hasType = true
+		}
 	}
-	return &transaction, nil
-}
+	query := `SELECT id, from_user_id, to_user_id, type, status, amount, created_at 
+	          FROM transactions WHERE from_user_id = $1`
+	args := []interface{}{id}
+	argIndex := 2 
 
+	if hasType {
+		query += fmt.Sprintf(" AND status = $%d", argIndex)
+		args = append(args, ttype)
+		argIndex++
+	}
 
-//bunun daha kapsamlı yazılması lazım debit ise alıcının veya göndereni almalı ona göre dikkate alınmalı!!!!
-// GetTransactionsByUserID retrieves all transactions for a given user
-func (r *transactionRepository) GetTransactionsByUserID(ctx context.Context, tx *sql.Tx, userID string) ([]*domain.Transaction, error) {
-	query := `SELECT id, from_user_id, type, status, amount, created_at FROM transactions WHERE from_user_id = $1 ORDER BY created_at DESC`
+	if limit > 0 {
+		query += fmt.Sprintf(" LIMIT $%d", argIndex)
+		args = append(args, limit)
+		argIndex++
+	}
+	if offset > 0 {
+		query += fmt.Sprintf(" OFFSET $%d", argIndex)
+		args = append(args, offset)
+		argIndex++
+	}
 
-	rows, err := tx.QueryContext(ctx, query, userID)
+	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
 	var transactions []*domain.Transaction
+
 	for rows.Next() {
-		var transaction domain.Transaction
-		if err := rows.Scan(&transaction.ID, &transaction.UserID, &transaction.Type, &transaction.Status, &transaction.Amount, &transaction.Description, &transaction.CreatedAt); err != nil {
+		var t domain.Transaction
+		err := rows.Scan(
+			&t.ID, &t.UserID, &t.ToUserID, &t.Type, &t.Status,
+			&t.Amount, &t.CreatedAt,
+		)
+		if err != nil {
 			return nil, err
 		}
-		transactions = append(transactions, &transaction)
+		transactions = append(transactions, &t)
 	}
 
-	if err = rows.Err(); err != nil {
+	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
 	return transactions, nil
 }
 
-// UpdateTransactionStatus updates the status of a specific transaction
-func (r *transactionRepository) UpdateTransactionStatus(ctx context.Context, tx *sql.Tx, id string, status domain.StatusType) error {
+func (r *transactionRepository) GetTranscaptionByID(ctx context.Context,tx *sql.Tx, id string)(*domain.Transaction, error){
+	query := `SELECT id, from_user_id, to_user_id, type, status, amount, created_at
+	          FROM transactions WHERE id = $1`
+
+	var t domain.Transaction
+	err := tx.QueryRowContext(ctx, query, id).Scan(
+		&t.ID,
+		&t.UserID,
+		&t.ToUserID,
+		&t.Type,
+		&t.Status,
+		&t.Amount,
+		&t.CreatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &t, nil
+}
+
+func (r *transactionRepository) UpdateTransactionStatus(ctx context.Context, tx *sql.Tx, id string, status domain.StatusType) (error) {
 	query := `UPDATE transactions SET status = $1 WHERE id = $2`
 	_, err := tx.ExecContext(ctx, query, status, id)
 	return err

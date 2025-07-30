@@ -1,5 +1,3 @@
-//Struct ile tanımlamalar yapılabilir
-
 package repository
 
 import (
@@ -10,7 +8,6 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// UserRepository defines the methods for interacting with user data.
 type UserRepository interface {
 	CreateUser(ctx context.Context, user *domain.User) error
 	GetUserByEmail(ctx context.Context, email string) (*domain.User, error)
@@ -20,18 +17,14 @@ type UserRepository interface {
 	DeleteUserByID(ctx context.Context, id string) (*domain.User, error)
 }
 
-// TransactionRepository defines the methods for interacting with transaction data.
 type TransactionRepository interface {
 	CreateTransaction(ctx context.Context, tx *sql.Tx, transaction *domain.Transaction) error
-	GetTransactionByID(ctx context.Context, id string) (*domain.Transaction, error)
-	GetTransactionsByUserID(ctx context.Context, tx *sql.Tx, userID string) ([]*domain.Transaction, error)
+	GetTransactionsByUserID(ctx context.Context, userID string, opts ...domain.TransactionQueryOption) ([]*domain.Transaction, error)
 	UpdateTransactionStatus(ctx context.Context, tx *sql.Tx, id string, status domain.StatusType) error
-
-	//update Transaction status eklencek
+	GetTranscaptionByID(ctx context.Context,tx *sql.Tx, id string)(*domain.Transaction, error)
 
 }
 
-// BalanceRepository defines the methods for interacting with balance data.
 type BalanceRepository interface {
 	GetBalanceByUserID(ctx context.Context, userID string) (*domain.Balance, error)
 	UpdateBalance(ctx context.Context, tx *sql.Tx, userID string, amount decimal.Decimal) error

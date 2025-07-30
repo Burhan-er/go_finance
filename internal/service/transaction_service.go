@@ -5,22 +5,19 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"go_finance/internal/api/middleware"
 	"go_finance/internal/domain"
-	"go_finance/internal/repository" // Repository'lerinizin bu pakette olduğunu varsayıyorum
+	"go_finance/internal/repository"
+	"go_finance/pkg/utils"
 	"time"
-
-	"github.com/google/uuid"
 )
 
-// transactionService, TransactionService arayüzünü uygular.
 type transactionService struct {
 	transactionRepo repository.TransactionRepository
 	balanceRepo     repository.BalanceRepository
-	db              *sql.DB // Veritabanı transactionlarını yönetmek için
+	db              *sql.DB
 }
 
-// NewTransactionService, transactionService'in yeni bir örneğini oluşturur.
-// Bu, bağımlılık enjeksiyonu için kullanılır.
 func NewTransactionService(
 	tr repository.TransactionRepository,
 	br repository.BalanceRepository,
@@ -33,19 +30,15 @@ func NewTransactionService(
 	}
 }
 
-// Credit, kullanıcının hesabına para yatırma işlemini yönetir.
 func (s *transactionService) Credit(ctx context.Context, req PostTransactionCreditRequest) (*PostTransactionCreditResponse, error) {
-	// Atomikliği sağlamak için bir veritabanı transaction'ı başlat
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
+		utils.Logger.Error("Failed to begin credit transaction", "error", err)
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	// Fonksiyon sonunda bir hata olursa transaction'ı geri al (rollback)
 	defer tx.Rollback()
 
-	// Yeni bir transaction domain nesnesi oluştur
 	newTransaction := &domain.Transaction{
-		ID:          uuid.New().String(),
 		UserID:      req.FromUserID,
 		ToUserID:    req.ToUserID,
 		Type:        req.Type,
@@ -56,30 +49,33 @@ func (s *transactionService) Credit(ctx context.Context, req PostTransactionCred
 		UpdatedAt:   time.Now(),
 	}
 
-	// Transaction'ı 'Pending' durumuyla veritabanına kaydet
 	if err := s.transactionRepo.CreateTransaction(ctx, tx, newTransaction); err != nil {
+		utils.Logger.Error("Failed to create credit transaction record", "error", err)
 		return nil, fmt.Errorf("failed to create transaction record: %w", err)
 	}
 
-	// Kullanıcının bakiyesini güncelle
 	if err := s.balanceRepo.UpdateBalance(ctx, tx, req.FromUserID, req.Amount); err != nil {
+		utils.Logger.Error("Failed to update sender balance for credit", "error", err)
 		return nil, fmt.Errorf("failed to update user balance: %w", err)
 	}
 
-	// Transaction durumunu 'Completed' olarak güncelle
-	// NOT: Verdiğiniz repo arayüzünde UpdateTransactionStatus *sql.Tx almıyor.
-	// Ancak atomiklik için alması gerekir. Kodun bu şekilde olması gerektiğini varsayarak yazıyorum.
-	// Gerekirse repository'nizi `UpdateTransactionStatus(ctx context.Context, tx *sql.Tx, id string, status domain.StatusType) error` şeklinde güncelleyin.
+	if err := s.balanceRepo.UpdateBalance(ctx, tx, req.ToUserID, req.Amount.Neg()); err != nil {
+		utils.Logger.Error("Failed to update receiver balance for credit", "error", err)
+		return nil, fmt.Errorf("failed to update user balance: %w", err)
+	}
+
 	if err := s.transactionRepo.UpdateTransactionStatus(ctx, tx, newTransaction.ID, domain.Completed); err != nil {
+		utils.Logger.Error("Failed to update credit transaction status", "error", err)
 		return nil, fmt.Errorf("failed to update transaction status: %w", err)
 	}
 
-	// Her şey yolunda gittiyse, transaction'ı onayla (commit)
 	if err := tx.Commit(); err != nil {
+		utils.Logger.Error("Failed to commit credit transaction", "error", err)
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
+	utils.Logger.Info("Credit transaction completed", "transaction_id", newTransaction.ID, "user_id", req.FromUserID, "amount", req.Amount)
 
-	newTransaction.Status = domain.Completed // Dönen nesnenin durumunu da güncelle
+	newTransaction.Status = domain.Completed
 
 	resp := &PostTransactionCreditResponse{
 		Transaction: newTransaction,
@@ -89,27 +85,28 @@ func (s *transactionService) Credit(ctx context.Context, req PostTransactionCred
 	return resp, nil
 }
 
-// Debit, kullanıcının hesabından para çekme işlemini yönetir.
 func (s *transactionService) Debit(ctx context.Context, req PostTransactionDebitRequest) (*PostTransactionDebitResponse, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
+		utils.Logger.Error("Failed to begin debit transaction", "error", err)
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
-	// Para çekmeden önce bakiye kontrolü yap
 	currentBalance, err := s.balanceRepo.GetBalanceByUserID(ctx, req.FromUserID)
 	if err != nil {
+		utils.Logger.Error("Failed to get user balance for debit", "error", err)
 		return nil, fmt.Errorf("failed to get user balance: %w", err)
 	}
 
-	if currentBalance.Amount < req.Amount { // last I'm here
+	if currentBalance.Amount.Compare(req.Amount) != +1 {
+		utils.Logger.Warn("Insufficient funds for debit", "user_id", req.FromUserID, "amount", req.Amount)
 		return nil, errors.New("insufficient funds")
 	}
 
 	newTransaction := &domain.Transaction{
-		ID:          uuid.New().String(),
 		UserID:      req.FromUserID,
+		ToUserID:    req.ToUserID,
 		Type:        req.Type,
 		Amount:      req.Amount,
 		Status:      domain.Pending,
@@ -119,21 +116,29 @@ func (s *transactionService) Debit(ctx context.Context, req PostTransactionDebit
 	}
 
 	if err := s.transactionRepo.CreateTransaction(ctx, tx, newTransaction); err != nil {
+		utils.Logger.Error("Failed to create debit transaction record", "error", err)
 		return nil, fmt.Errorf("failed to create transaction record: %w", err)
 	}
 
-	// Bakiyeyi azaltmak için negatif miktar gönder
-	if err := s.balanceRepo.UpdateBalance(ctx, tx, req.FromUserID, -req.Amount); err != nil {
+	if err := s.balanceRepo.UpdateBalance(ctx, tx, req.FromUserID, req.Amount.Neg()); err != nil {
+		utils.Logger.Error("Failed to update sender balance for debit", "error", err)
+		return nil, fmt.Errorf("failed to update user balance: %w", err)
+	}
+	if err := s.balanceRepo.UpdateBalance(ctx, tx, req.ToUserID, req.Amount); err != nil {
+		utils.Logger.Error("Failed to update receiver balance for debit", "error", err)
 		return nil, fmt.Errorf("failed to update user balance: %w", err)
 	}
 
 	if err := s.transactionRepo.UpdateTransactionStatus(ctx, tx, newTransaction.ID, domain.Completed); err != nil {
+		utils.Logger.Error("Failed to update debit transaction status", "error", err)
 		return nil, fmt.Errorf("failed to update transaction status: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
+		utils.Logger.Error("Failed to commit debit transaction", "error", err)
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
+	utils.Logger.Info("Debit transaction completed", "transaction_id", newTransaction.ID, "user_id", req.FromUserID, "amount", req.Amount)
 
 	newTransaction.Status = domain.Completed
 
@@ -145,28 +150,26 @@ func (s *transactionService) Debit(ctx context.Context, req PostTransactionDebit
 	return resp, nil
 }
 
-// Transfer, iki kullanıcı arasında para transferi işlemini yönetir.
 func (s *transactionService) Transfer(ctx context.Context, req PostTransactionTransferRequest) (*PostTransactionTransferResponse, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
+		utils.Logger.Error("Failed to begin transfer transaction", "error", err)
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
-	// Gönderen kullanıcının bakiye kontrolü
 	senderBalance, err := s.balanceRepo.GetBalanceByUserID(ctx, req.FromUserID)
 	if err != nil {
+		utils.Logger.Error("Failed to get sender's balance for transfer", "error", err)
 		return nil, fmt.Errorf("failed to get sender's balance: %w", err)
 	}
 
-	if senderBalance.Amount < req.Amount {
+	if senderBalance.Amount.Cmp(req.Amount) == -1 {
+		utils.Logger.Warn("Insufficient funds for transfer", "user_id", req.FromUserID, "amount", req.Amount)
 		return nil, errors.New("insufficient funds for transfer")
 	}
 
-	// Not: domain.Transaction'da transferin karşı tarafını tutmak için
-	// RelatedUserID gibi bir alan olması faydalı olur.
 	newTransaction := &domain.Transaction{
-		ID:          uuid.New().String(),
 		UserID:      req.FromUserID,
 		ToUserID:    req.ToUserID,
 		Type:        domain.Transfer,
@@ -178,26 +181,30 @@ func (s *transactionService) Transfer(ctx context.Context, req PostTransactionTr
 	}
 
 	if err := s.transactionRepo.CreateTransaction(ctx, tx, newTransaction); err != nil {
+		utils.Logger.Error("Failed to create transfer transaction record", "error", err)
 		return nil, fmt.Errorf("failed to create transaction record: %w", err)
 	}
 
-	// Gönderenden parayı düş
-	if err := s.balanceRepo.UpdateBalance(ctx, tx, req.FromUserID, -req.Amount); err != nil {
+	if err := s.balanceRepo.UpdateBalance(ctx, tx, req.FromUserID, req.Amount.Neg()); err != nil {
+		utils.Logger.Error("Failed to debit from sender for transfer", "error", err)
 		return nil, fmt.Errorf("failed to debit from sender: %w", err)
 	}
 
-	// Alıcıya parayı ekle
 	if err := s.balanceRepo.UpdateBalance(ctx, tx, req.ToUserID, req.Amount); err != nil {
+		utils.Logger.Error("Failed to credit to receiver for transfer", "error", err)
 		return nil, fmt.Errorf("failed to credit to receiver: %w", err)
 	}
 
 	if err := s.transactionRepo.UpdateTransactionStatus(ctx, tx, newTransaction.ID, domain.Completed); err != nil {
+		utils.Logger.Error("Failed to update transfer transaction status", "error", err)
 		return nil, fmt.Errorf("failed to update transaction status: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
+		utils.Logger.Error("Failed to commit transfer transaction", "error", err)
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
+	utils.Logger.Info("Transfer transaction completed", "transaction_id", newTransaction.ID, "from_user_id", req.FromUserID, "to_user_id", req.ToUserID, "amount", req.Amount)
 
 	newTransaction.Status = domain.Completed
 
@@ -209,44 +216,61 @@ func (s *transactionService) Transfer(ctx context.Context, req PostTransactionTr
 	return resp, nil
 }
 
-// GetHistory, bir kullanıcının işlem geçmişini getirir.
-// NOT: Verdiğiniz GetTransactionHistoryRequest'te UserID yok. Genellikle işlem geçmişi
-// belirli bir kullanıcı için istenir. Bu yüzden `GetTransactionsByUserID` kullanıldı.
-// Gerekirse isteğe UserID eklenmeli veya tüm işlemleri getiren bir repo metodu yazılmalıdır.
-// Ayrıca repoda sayfalama (pagination) desteği eklenmesi (offset, limit) daha verimli olacaktır.
 func (s *transactionService) GetHistory(ctx context.Context, req GetTransactionHistoryRequest) (*GetTransactionHistoryResponse, error) {
-	// Bu örnekte, UserID'nin bir şekilde (örneğin JWT'den) alınıp
-	// GetTransactionsByUserID'ye verildiği varsayılmıştır.
-	// Şimdilik bu metot, verdiğiniz arayüzlere göre tam olarak implemente edilemez.
-	// Örnek olarak boş bir liste döndürüyorum ve bir hata mesajı veriyorum.
-	// Gerçek bir senaryoda bu kısmın tasarıma göre doldurulması gerekir.
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+	if ctx.Value(middleware.UserIDKey) != *req.UserID && ctx.Value(middleware.UserRoleKey) != domain.AdminRole {
+		return nil, errors.New("you dont have any access")
+	}
+	var opts []domain.TransactionQueryOption
 
-	// Örnek: userID := "jwt-den-gelen-id"
-	// transactions, err := s.transactionRepo.GetTransactionsByUserID(ctx, userID)
-	return nil, errors.New("GetHistory requires a UserID, which is missing from the request struct; also repository needs pagination support")
+	if req.Limit != nil {
+		opts = append(opts, domain.Limit(*req.Limit))
+	}
+	if req.Offset != nil {
+		opts = append(opts, domain.Offset(*req.Offset))
+	}
+	if req.Type != nil {
+		opts = append(opts, domain.StatusType(*req.Type))
+	}
 
-	// Eğer tüm işlemleri getiren bir repo metodunuz olsaydı (ör: GetAllTransactions(ctx, limit, offset)) şöyle olurdu:
-	// transactions, err := s.transactionRepo.GetAllTransactions(ctx, req.Limit, (req.Page-1)*req.Limit)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to get transaction history: %w", err)
-	// }
-	//
-	// resp := &GetTransactionHistoryResponse{
-	// 	Transactions: transactions,
-	// }
-	// return resp, nil
+	transactions, err := s.transactionRepo.GetTransactionsByUserID(ctx, *req.UserID, opts...)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get transactions by user id: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	resp := &GetTransactionHistoryResponse{
+		Transactions: transactions,
+	}
+
+	return resp, nil
 }
 
-// GetByID, ID'ye göre tek bir işlemi getirir.
 func (s *transactionService) GetByID(ctx context.Context, req GetTransactionByIdRequest) (*GetTransactionByIdResponse, error) {
-	transaction, err := s.transactionRepo.GetTransactionByID(ctx, req.ID)
+
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		// Veritabanında bulunamama durumunu (sql.ErrNoRows) daha spesifik bir hata ile dönebiliriz.
+		return nil, fmt.Errorf("failed to begin get by id transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	transaction, err := s.transactionRepo.GetTranscaptionByID(ctx, tx, req.ID)
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("transaction with ID %s not found", req.ID)
 		}
 		return nil, fmt.Errorf("failed to get transaction by ID: %w", err)
 	}
+
+	_ = tx.Commit()
 
 	resp := &GetTransactionByIdResponse{
 		Transaction: transaction,

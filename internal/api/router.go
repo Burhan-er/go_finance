@@ -20,7 +20,6 @@ type Handlers struct {
 func NewRouter(authMiddleware *mWare.AuthMiddleware,h Handlers) http.Handler {
 	r := chi.NewRouter()
 
-	// Temel middleware'ler
 	r.Use(middleware.Logger)    // Gelen istekleri loglar
 	r.Use(middleware.Recoverer) // Panic durumlarında sunucunun çökmesini engeller
 	r.Use(middleware.RequestID)

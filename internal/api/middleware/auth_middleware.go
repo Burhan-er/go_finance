@@ -23,7 +23,6 @@ const (
     UserExpKey  
 )
 
-// String metodu ekleyerek her key için özel string gösterimi tanımlayalım
 func (k contextKey) String() string {
     switch k {
     case UserIDKey:
@@ -45,7 +44,6 @@ func NewAuthMiddleware(secret string) *AuthMiddleware {
 	}
 }
 
-// RequireAuth checks if the request has a valid JWT token
 func (m *AuthMiddleware) RequireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
@@ -54,7 +52,6 @@ func (m *AuthMiddleware) RequireAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		// Bearer token'ı ayıkla
 		bearerToken := strings.Split(authHeader, " ")
 		if len(bearerToken) != 2 || bearerToken[0] != "Bearer" {
 			http.Error(w, "Invalid authorization header format", http.StatusUnauthorized)
@@ -86,7 +83,6 @@ func (m *AuthMiddleware) RequireAuth(next http.Handler) http.Handler {
 			http.Error(w, "Token expired", http.StatusUnauthorized)
 		}
 
-		// Claims'i context'e ekle
 		ctx := context.WithValue(r.Context(), UserIDKey, claims["sub"])
 		ctx = context.WithValue(ctx, UserRoleKey, claims["role"])
 		ctx = context.WithValue(ctx, UserEmailKey, claims["email"])

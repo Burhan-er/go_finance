@@ -6,6 +6,11 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+type TransactionQueryOption interface{}
+
+type Limit int
+type Offset int
+type StatusType string
 type TransactionType string
 
 const (
@@ -13,8 +18,6 @@ const (
 	Withdrawal TransactionType = "withdrawal"
 	Transfer   TransactionType = "transfer"
 )
-
-type StatusType string
 
 const (
 	Pending   StatusType = "pending"

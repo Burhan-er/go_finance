@@ -5,42 +5,31 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-
-	// Modern ve yapısallaştırılmış loglama için
-	// Projenizin domain ve repository paketlerinin yollarını buraya yazın
 	"go_finance/internal/domain"
 	"go_finance/internal/repository"
+	"go_finance/pkg/utils"
 )
 
 type balanceService struct {
 	balanceRepo repository.BalanceRepository
-	//logger      *slog.Logger
 }
 
-// NewBalanceService, BalanceService'in yeni bir örneğini oluşturur.
-// Bu, "Dependency Injection" için kullanılan bir yapıcı fonksiyondur.
 func NewBalanceService(repo repository.BalanceRepository) BalanceService {
 	return &balanceService{
 		balanceRepo: repo,
-		// logger:      logger,
 	}
 }
 
-// GetCurrent, bir kullanıcının mevcut bakiyesini alır.
 func (s *balanceService) GetCurrent(ctx context.Context, req GetBalanceCurrentRequest) (*GetBalanceCurrentResponse, error) {
 	if req.UserID == "" {
-		return nil, errors.New("user ID is required")
+		return nil, errors.New("User ID is required")
 	}
-
 	balance, err := s.balanceRepo.GetBalanceByUserID(ctx, req.UserID)
 	if err != nil {
-		// s.logger.Error("failed to get balance from repository", "user_id", req.UserID, "error", err)
-		// Burada hatayı sarmalayarak daha anlamlı bir mesaj verebiliriz.
-		// Örneğin sql.ErrNoRows hatasını "kullanıcı bulunamadı" gibi bir hataya çevirebiliriz.
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("user not found with id: %s", req.UserID)
+			return nil, errors.New("user not found")
 		}
-		return nil, fmt.Errorf("internal server error") // Kullanıcıya iç hatayı göstermeyiz.
+		return nil, errors.New("internal server error")
 	}
 
 	response := &GetBalanceCurrentResponse{
@@ -53,13 +42,8 @@ func (s *balanceService) GetCurrent(ctx context.Context, req GetBalanceCurrentRe
 
 	return response, nil
 }
-
-// GetHistorical, bir kullanıcının belirli bir zaman aralığındaki bakiye geçmişini alır.
-// NOT: Sağlanan BalanceRepository bu işlevselliği desteklememektedir.
-// Bu, gerçek bir senaryoda nasıl görünebileceğini gösteren bir yer tutucudur.
 func (s *balanceService) GetHistorical(ctx context.Context, req GetBalanceHistoricalRequest) (*GetBalanceHistoricalResponse, error) {
 	// s.logger.Warn("GetHistorical is not fully implemented due to repository limitations", "user_id", req.UserID)
-
 	// GERÇEK UYGULAMA NASIL OLURDU?
 	// 1. Repository'de `GetTransactionHistory(ctx, userID, startDate, endDate)` gibi bir metodunuz olurdu.
 	// 2. Bu metot, `transactions` tablosundan ilgili kayıtları çekerdi.
@@ -79,9 +63,6 @@ func (s *balanceService) GetHistorical(ctx context.Context, req GetBalanceHistor
 
 }
 
-// GetAtTime, bir kullanıcının belirli bir zamandaki bakiyesini hesaplar.
-// NOT: Sağlanan BalanceRepository bu işlevselliği desteklememektedir.
-// Bu, gerçek bir senaryoda nasıl görünebileceğini gösteren bir yer tutucudur.
 func (s *balanceService) GetAtTime(ctx context.Context, req GetBalanceAtTimeRequest) (*GetBalanceAtTimeResponse, error) {
 	//s.logger.Warn("GetAtTime is not fully implemented due to repository limitations", "user_id", req.UserID)
 
