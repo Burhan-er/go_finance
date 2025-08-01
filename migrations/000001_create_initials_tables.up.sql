@@ -29,7 +29,7 @@ CREATE TABLE balances (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE TABLE audit_logs   (
+CREATE TABLE audit_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     entity_type VARCHAR(50) NOT NULL,
     entity_id UUID, 
@@ -37,6 +37,33 @@ CREATE TABLE audit_logs   (
     details VARCHAR(200),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS balance_history (
+    id SERIAL PRIMARY KEY,
+    user_id UUID NOT NULL,
+    amount NUMERIC(15,2) NOT NULL,
+    recorded_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE OR REPLACE FUNCTION fn_balance_history_trigger()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO balance_history(user_id, amount, recorded_at)
+    VALUES (NEW.user_id, NEW.amount, NOW());
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_balance_update
+AFTER UPDATE ON balances
+FOR EACH ROW
+EXECUTE FUNCTION fn_balance_history_trigger();
+
+CREATE TRIGGER trg_balance_insert
+AFTER INSERT ON balances
+FOR EACH ROW
+EXECUTE FUNCTION fn_balance_history_trigger();
 
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$

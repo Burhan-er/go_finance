@@ -4,11 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"go_finance/internal/api/middleware"
 	"go_finance/internal/domain"
 	"go_finance/internal/repository"
-
-	"github.com/shopspring/decimal"
+	"go_finance/pkg/utils"
 )
 
 type balanceService struct {
@@ -26,18 +26,24 @@ func NewBalanceService(repo repository.BalanceRepository, auditLogService AuditL
 func (s *balanceService) GetCurrent(ctx context.Context, req GetBalanceCurrentRequest) (*GetBalanceCurrentResponse, error) {
 	s.auditLogService.Create(ctx, "balance", req.UserID, "get_current_attempt", "Get current balance attempt")
 	if req.UserID == "" {
+		utils.Logger.Warn("User ID required for current balance retrieval")
 		return nil, errors.New("user id required")
 	}
+
 	balance, err := s.balanceRepo.GetBalanceByUserID(ctx, req.UserID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			utils.Logger.Warn("User not found while retrieving balance", "userID", req.UserID)
 			s.auditLogService.Create(ctx, "balance", req.UserID, "get_current_failed", "User not found for balance")
 			return nil, errors.New("user not found")
 		}
+		utils.Logger.Error("Error retrieving balance", "userID", req.UserID, "error", err)
 		s.auditLogService.Create(ctx, "balance", req.UserID, "get_current_failed", "Internal server error for balance")
 		return nil, errors.New("internal server error")
 	}
+
 	s.auditLogService.Create(ctx, "balance", req.UserID, "get_current_success", "Current balance retrieved successfully")
+	utils.Logger.Info("Current balance retrieved successfully", "userID", req.UserID)
 
 	response := &GetBalanceCurrentResponse{
 		Balance: &domain.Balance{
@@ -49,49 +55,64 @@ func (s *balanceService) GetCurrent(ctx context.Context, req GetBalanceCurrentRe
 
 	return response, nil
 }
-func (s *balanceService) GetHistorical(ctx context.Context, req GetBalanceHistoricalRequest) (*GetBalanceHistoricalResponse, error){
-	return nil,nil
+
+func (s *balanceService) GetHistorical(ctx context.Context, req GetBalanceHistoricalRequest) (*GetBalanceHistoricalResponse, error) {
+	s.auditLogService.Create(ctx, "balance", req.UserID, "get_historical_attempt", "Get historical balance attempt")
+	if req.UserID == "" {
+		utils.Logger.Warn("User ID required for historical balance retrieval")
+		return nil, errors.New("user id required")
+	}
+	if req.StartDate == "" || req.EndDate == "" {
+		utils.Logger.Warn("Date range missing for historical balance", "start", req.StartDate, "end", req.EndDate)
+		return nil, errors.New("start date and end date are required")
+	}
+
+	history, err := s.balanceRepo.GetBalanceHistoryByUserID(ctx, req.UserID, req.StartDate, req.EndDate)
+	if err != nil {
+		utils.Logger.Error("Error retrieving balance history", "userID", req.UserID, "error", err)
+		s.auditLogService.Create(ctx, "balance", req.UserID, "get_historical_failed", "Internal server error for balance history")
+		return nil, errors.New("internal server error")
+	}
+
+	s.auditLogService.Create(ctx, "balance", req.UserID, "get_historical_success", "Historical balance retrieved successfully")
+	utils.Logger.Info("Historical balance retrieved successfully", "userID", req.UserID)
+
+	response := &GetBalanceHistoricalResponse{
+		History: history,
+	}
+	return response, nil
 }
-// func (s *balanceService) GetHistorical(ctx context.Context, req GetBalanceHistoricalRequest) (*GetBalanceHistoricalResponse, error) {
-// 	s.auditLogService.Create(ctx, "balance", req.UserID, "get_historical_attempt", "Get historical balance attempt")
-// 	logs, err := s.auditLogService.List(ctx, "balance")
-// 	if err != nil {
-// 		s.auditLogService.Create(ctx, "balance", req.UserID, "get_historical_failed", "Failed to retrieve historical balance logs")
-// 		return nil, errors.New("failed to retrieve historical balance logs")
-// 	}
-// 	s.auditLogService.Create(ctx, "balance", req.UserID, "get_historical_success", "Historical balance logs retrieved successfully")
-// 	return &GetBalanceHistoricalResponse{
-// 		History: convertAuditLogsToBalances(logs),
-// 	}, nil
-// }
 
 func (s *balanceService) GetAtTime(ctx context.Context, req GetBalanceAtTimeRequest) (*GetBalanceAtTimeResponse, error) {
-	var userID string
-	userIDValue := ctx.Value(middleware.UserIDKey)
-	if v, ok := userIDValue.(string); ok {
-		userID = v
-	} else {
-		return nil, errors.New("user id not found in context")
+	s.auditLogService.Create(ctx, "balance", "", "get_at_time_attempt", "Get balance at specific time attempt")
+
+	if req.UserID != ctx.Value(middleware.UserIDKey) && ctx.Value(middleware.UserRoleKey) != domain.AdminRole {
+		utils.Logger.Warn("Unauthorized access to balance at time", "requestUser", req.UserID)
+		return nil, fmt.Errorf("you dont have access")
 	}
-	s.auditLogService.Create(ctx, "balance", userID, "get_at_time_attempt", "Get balance at specific time attempt")
-	logs, err := s.auditLogService.List(ctx, "balance")
+
+	if req.Timestamp.IsZero() {
+		utils.Logger.Warn("Timestamp is required for balance at time query")
+		return nil, errors.New("timestamp is required")
+	}
+
+	balance, err := s.balanceRepo.GetBalanceAtTime(ctx, req.UserID, req.Timestamp)
 	if err != nil {
-		s.auditLogService.Create(ctx, "balance", userID, "get_at_time_failed", "Failed to retrieve balance logs for specific time")
-		return nil, errors.New("failed to retrieve balance logs for specific time")
-	}
-	var balanceAtTime *domain.Balance
-	amount, _ := decimal.NewFromString("0.00")
-	for _, log := range logs {
-		if log.CreatedAt.Equal(req.Timestamp) || log.CreatedAt.Before(req.Timestamp) {
-			balanceAtTime = &domain.Balance{
-				UserID:        userID,
-				Amount:        amount,
-				LastUpdatedAt: log.CreatedAt,
-			}
+		if errors.Is(err, sql.ErrNoRows) {
+			utils.Logger.Warn("Balance not found at given time", "userID", req.UserID, "timestamp", req.Timestamp)
+			s.auditLogService.Create(ctx, "balance", "", "get_at_time_failed", "Balance not found at given time")
+			return nil, errors.New("balance not found at given time")
 		}
+		utils.Logger.Error("Error retrieving balance at time", "userID", req.UserID, "timestamp", req.Timestamp, "error", err)
+		s.auditLogService.Create(ctx, "balance", "", "get_at_time_failed", "Internal server error for balance at time")
+		return nil, errors.New("internal server error")
 	}
-	s.auditLogService.Create(ctx, "balance", userID, "get_at_time_success", "Balance at specific time retrieved successfully")
-	return &GetBalanceAtTimeResponse{
-		Balance: balanceAtTime,
-	}, nil
+
+	s.auditLogService.Create(ctx, "balance", "", "get_at_time_success", "Balance at given time retrieved successfully")
+	utils.Logger.Info("Balance at time retrieved successfully", "userID", req.UserID, "timestamp", req.Timestamp)
+
+	response := &GetBalanceAtTimeResponse{
+		Balance: balance,
+	}
+	return response, nil
 }

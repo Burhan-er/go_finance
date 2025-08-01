@@ -45,3 +45,54 @@ func (r *balanceRepository) UpdateBalance(ctx context.Context, tx *sql.Tx, userI
 	_, err := tx.ExecContext(ctx, query, amount, time.Now(), userID)
 	return err
 }
+func (r *balanceRepository) GetBalanceHistoryByUserID(ctx context.Context, userID, startDate, endDate string) ([]*domain.BalanceHistory, error) {
+	query := `
+		SELECT id, user_id, amount, recorded_at
+		FROM balance_history
+		WHERE user_id = $1
+		  AND recorded_at BETWEEN $2 AND $3
+		ORDER BY recorded_at ASC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, userID, startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var history []*domain.BalanceHistory
+	for rows.Next() {
+		var bh domain.BalanceHistory
+		err := rows.Scan(&bh.ID, &bh.UserID, &bh.Amount, &bh.RecordedAt)
+		if err != nil {
+			return nil, err
+		}
+		history = append(history, &bh)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return history, nil
+}
+
+func (r *balanceRepository) GetBalanceAtTime(ctx context.Context, userID string, timestamp time.Time) (*domain.Balance, error) {
+	query := `
+		SELECT user_id, amount, recorded_at
+		FROM balance_history
+		WHERE user_id = $1
+		  AND recorded_at <= $2
+		ORDER BY recorded_at DESC
+		LIMIT 1
+	`
+
+	var balance domain.Balance
+	err := r.db.QueryRowContext(ctx, query, userID, timestamp).Scan(
+		&balance.UserID, &balance.Amount, &balance.LastUpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &balance, nil
+}

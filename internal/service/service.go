@@ -126,7 +126,7 @@ type GetBalanceHistoricalRequest struct {
 }
 
 type GetBalanceHistoricalResponse struct {
-	History []*domain.Balance `json:"history"`
+	History []*domain.BalanceHistory `json:"history"`
 }
 
 type GetBalanceCurrentRequest struct {
@@ -138,6 +138,7 @@ type GetBalanceCurrentResponse struct {
 }
 
 type GetBalanceAtTimeRequest struct {
+	UserID string
 	Timestamp time.Time
 }
 

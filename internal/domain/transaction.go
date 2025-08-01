@@ -34,5 +34,4 @@ type Transaction struct {
 	Amount      decimal.Decimal `json:"amount"`
 	Description string          `json:"description"`
 	CreatedAt   time.Time       `json:"created_at"`
-	UpdatedAt   time.Time       `json:"updated_at"`
 }

@@ -33,7 +33,6 @@ func (r *transactionRepository) CreateTransaction(ctx context.Context, tx *sql.T
 		transaction.Status,
 		transaction.Amount,
 		transaction.CreatedAt,
-		transaction.UpdatedAt,
 		transaction.Description, 
 	).Scan(&insertedID)
 

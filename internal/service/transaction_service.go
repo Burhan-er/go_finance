@@ -50,7 +50,6 @@ func (s *transactionService) Credit(ctx context.Context, req PostTransactionCred
 		Status:      domain.Pending,
 		Description: req.Description,
 		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
 	}
 
 	insertedID, err := s.transactionRepo.CreateTransaction(ctx, tx, newTransaction)
@@ -125,7 +124,6 @@ func (s *transactionService) Debit(ctx context.Context, req PostTransactionDebit
 		Status:      domain.Pending,
 		Description: req.Description,
 		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
 	}
 
 	insertedID, err := s.transactionRepo.CreateTransaction(ctx, tx, newTransaction)
@@ -197,7 +195,6 @@ func (s *transactionService) Transfer(ctx context.Context, req PostTransactionTr
 		Status:      domain.Pending,
 		Description: req.Description,
 		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
 	}
 
 	insertedID, err := s.transactionRepo.CreateTransaction(ctx, tx, newTransaction)

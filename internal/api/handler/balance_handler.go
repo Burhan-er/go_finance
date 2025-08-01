@@ -34,24 +34,14 @@ func (h *BalanceHandler) GetCurrentBalance(w http.ResponseWriter, r *http.Reques
 func (h *BalanceHandler) GetHistoricalBalances(w http.ResponseWriter, r *http.Request) {
 	var req service.GetBalanceHistoricalRequest
 
-	// pageStr := r.URL.Query().Get("Page")
-	// limitStr := r.URL.Query().Get("Limit")
-
-	// page, pageConvertErr := strconv.Atoi(pageStr)
-	// if pageConvertErr != nil {
-	// 	http.Error(w, fmt.Sprintf("%s is not a Number", pageStr), http.StatusBadRequest)
-	// 	return
-	// }
-
-	// limit, limitConvertError := strconv.Atoi(limitStr)
-	// if limitConvertError != nil {
-	// 	http.Error(w, fmt.Sprintf("%s is not a Number", limitStr), http.StatusBadRequest)
-	// 	return
-	// }
-
-	// req.Page = page
-	// req.Limit = limit
-
+	req.UserID = r.URL.Query().Get("user_id")
+	req.StartDate = r.URL.Query().Get("start_date")
+	req.EndDate = r.URL.Query().Get("end_date")
+	
+	if req.UserID == "" || req.StartDate == "" || req.EndDate == "" {
+		http.Error(w,"failed to read params",http.StatusBadRequest)
+		return 
+	}
 	balances, getBalanceErr := h.balanceService.GetHistorical(r.Context(), req)
 	if getBalanceErr != nil {
 		http.Error(w, getBalanceErr.Error(), http.StatusInternalServerError)
@@ -66,6 +56,12 @@ func (h *BalanceHandler) GetHistoricalBalances(w http.ResponseWriter, r *http.Re
 func (h *BalanceHandler) GetBalanceAtTime(w http.ResponseWriter, r *http.Request) {
 	var req service.GetBalanceAtTimeRequest
 
+	req.UserID = r.URL.Query().Get("user_id")
+
+	if req.UserID == "" {
+		http.Error(w,"failed to read params",http.StatusBadRequest)
+		return 
+	}
 	timestampStr := r.URL.Query().Get("timestamp")
 	if timestampStr == "" {
 		http.Error(w, "Query parameter 'timestamp' is required", http.StatusBadRequest)
