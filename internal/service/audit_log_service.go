@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"go_finance/internal/domain"
+	"go_finance/internal/repository"
 	"go_finance/pkg/utils"
 	"time"
 )
@@ -13,15 +14,10 @@ type AuditLogService interface {
 }
 
 type auditLogService struct {
-	repo AuditLogRepository
+	repo repository.AuditLogRepository
 }
 
-type AuditLogRepository interface {
-	CreateAuditLog(ctx context.Context, log *domain.AuditLog) error
-	ListAuditLogs(ctx context.Context, entityType string) ([]*domain.AuditLog, error)
-}
-
-func NewAuditLogService(repo AuditLogRepository) AuditLogService {
+func NewAuditLogService(repo repository.AuditLogRepository) AuditLogService {
 	return &auditLogService{repo: repo}
 }
 

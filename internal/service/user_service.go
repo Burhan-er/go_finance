@@ -14,22 +14,32 @@ import (
 )
 
 type userService struct {
-	userRepo     repository.UserRepository
-	balanceRepo  repository.BalanceRepository
-	jwtSecret    string
-	jwtExpiresIn time.Duration
+	userRepo        repository.UserRepository
+	balanceRepo     repository.BalanceRepository
+	jwtSecret       string
+	jwtExpiresIn    time.Duration
+	auditLogService AuditLogService
 }
 
-func NewUserService(repo repository.UserRepository, balanceRepo repository.BalanceRepository, secret string, expiresIn time.Duration) *userService {
+func NewUserService(
+	repo repository.UserRepository,
+	balanceRepo repository.BalanceRepository,
+	secret string,
+	expiresIn time.Duration,
+	auditLogService AuditLogService,
+) *userService {
 	return &userService{
-		userRepo:     repo,
-		balanceRepo:  balanceRepo,
-		jwtSecret:    secret,
-		jwtExpiresIn: expiresIn,
+		userRepo:        repo,
+		balanceRepo:     balanceRepo,
+		jwtSecret:       secret,
+		jwtExpiresIn:    expiresIn,
+		auditLogService: auditLogService,
 	}
 }
 
 func (s *userService) Register(ctx context.Context, req RegisterRequest) (*RegisterResponse, error) {
+	auditDetails := "User registration attempt: username=" + req.Username + ", email=" + req.Email
+	s.auditLogService.Create(ctx, "user", "", "register_attempt", auditDetails)
 	existing, _ := s.userRepo.GetUserByEmail(ctx, req.Email)
 	if existing != nil {
 		return nil, errors.New("email already taken")
@@ -42,11 +52,13 @@ func (s *userService) Register(ctx context.Context, req RegisterRequest) (*Regis
 
 	if err := newUser.HashPassword(req.Password); err != nil {
 		utils.Logger.Error("Error hashing password", "error", err)
+		s.auditLogService.Create(ctx, "user", "", "register_failed", "Password hashing failed")
 		return nil, errors.New("could not process request")
 	}
 
 	if err := s.userRepo.CreateUser(ctx, newUser); err != nil {
 		utils.Logger.Error("Error creating user in repository", "error", err)
+		s.auditLogService.Create(ctx, "user", "", "register_failed", "User creation failed")
 		return nil, errors.New("could not create user")
 	}
 
@@ -57,7 +69,9 @@ func (s *userService) Register(ctx context.Context, req RegisterRequest) (*Regis
 		LastUpdatedAt: time.Now(),
 	}); err != nil {
 		utils.Logger.Error("Error creating user's balance", "error", err)
+		s.auditLogService.Create(ctx, "balance", newUser.ID, "balance_create_failed", "Balance creation failed for user")
 	}
+	s.auditLogService.Create(ctx, "user", newUser.ID, "register_success", "User registered successfully")
 
 	return &RegisterResponse{
 		User:    newUser,
@@ -66,21 +80,26 @@ func (s *userService) Register(ctx context.Context, req RegisterRequest) (*Regis
 }
 
 func (s *userService) Login(ctx context.Context, req LoginRequest) (*LoginResponse, error) {
+	s.auditLogService.Create(ctx, "user", "", "login_attempt", "Login attempt for email="+req.Email)
 	user, err := s.userRepo.GetUserByEmail(ctx, req.Email)
 	if err != nil {
 		utils.Logger.Warn("User not found by email", "email", req.Email, "error", err)
+		s.auditLogService.Create(ctx, "user", "", "login_failed", "User not found for email="+req.Email)
 		return nil, errors.New("invalid credentials")
 	}
 
 	if !user.CheckPassword(req.Password) {
+		s.auditLogService.Create(ctx, "user", user.ID, "login_failed", "Invalid password for user")
 		return nil, errors.New("invalid credentials")
 	}
 
 	token, err := s.generateJWT(user)
 	if err != nil {
 		utils.Logger.Error("Could not generate JWT", "error", err)
+		s.auditLogService.Create(ctx, "user", user.ID, "login_failed", "JWT generation failed")
 		return nil, errors.New("could not process login")
 	}
+	s.auditLogService.Create(ctx, "user", user.ID, "login_success", "User logged in successfully")
 
 	return &LoginResponse{
 		User:        user,
@@ -134,6 +153,7 @@ func (s *userService) GetAllUsers(ctx context.Context, req GetAllUsersRequest) (
 	}, nil
 }
 func (s *userService) UpdateUser(ctx context.Context, req PutUserByIdRequest) (*PutUserByIdResponse, error) {
+	s.auditLogService.Create(ctx, "user", req.ID, "update_attempt", "User update attempt")
 	if ctx.Value(middleware.UserRoleKey) != "admin" {
 		if ctx.Value(middleware.UserIDKey) != req.ID {
 			return nil, errors.New("you dont have any access")
@@ -142,8 +162,10 @@ func (s *userService) UpdateUser(ctx context.Context, req PutUserByIdRequest) (*
 
 	user, err := s.userRepo.UpdateUserByID(ctx, req.ID)
 	if err != nil {
+		s.auditLogService.Create(ctx, "user", req.ID, "update_failed", "User update failed")
 		return nil, err
 	}
+	s.auditLogService.Create(ctx, "user", req.ID, "update_success", "User updated successfully")
 
 	return &PutUserByIdResponse{
 		User:    user,
@@ -151,6 +173,7 @@ func (s *userService) UpdateUser(ctx context.Context, req PutUserByIdRequest) (*
 	}, nil
 }
 func (s *userService) DeleteUser(ctx context.Context, req DeleteUserByIdRequest) (*DeleteUserByIdResponse, error) {
+	s.auditLogService.Create(ctx, "user", req.ID, "delete_attempt", "User delete attempt")
 	if ctx.Value(middleware.UserRoleKey) != "admin" {
 		if ctx.Value(middleware.UserIDKey) != req.ID {
 			return nil, errors.New("you dont have any access")
@@ -159,8 +182,10 @@ func (s *userService) DeleteUser(ctx context.Context, req DeleteUserByIdRequest)
 
 	_, err := s.userRepo.DeleteUserByID(ctx, req.ID)
 	if err != nil {
+		s.auditLogService.Create(ctx, "user", req.ID, "delete_failed", "User delete failed")
 		return nil, err
 	}
+	s.auditLogService.Create(ctx, "user", req.ID, "delete_success", "User deleted successfully")
 
 	return &DeleteUserByIdResponse{
 		Message: "User deleted successfully",

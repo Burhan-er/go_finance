@@ -2,6 +2,7 @@ package utils
 
 import (
 	"context"
+	"go_finance/internal/api/middleware"
 	"log/slog"
 	"os"
 )
@@ -13,5 +14,5 @@ func InitLogger() {
 }
 
 func WithContext(ctx context.Context) *slog.Logger {
-	return Logger.With("request_id", ctx.Value("request_id"))
+	return Logger.With("user_id", ctx.Value(middleware.UserIDKey))
 }

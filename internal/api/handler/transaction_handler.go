@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go_finance/internal/domain"
 	"go_finance/internal/service"
+	"go_finance/pkg/utils"
 	"net/http"
 	"strconv"
 
@@ -24,12 +25,14 @@ func (h *TransactionHandler) CreditTransaction(w http.ResponseWriter, r *http.Re
 	var req service.PostTransactionCreditRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.Logger.Warn("failed to read request.body for credit transaction", "error", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	transaction, err := h.transactionService.Credit(r.Context(), req)
 	if err != nil {
+		utils.Logger.Error("failed to process credit transaction", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -43,12 +46,14 @@ func (h *TransactionHandler) DebitTransaction(w http.ResponseWriter, r *http.Req
 	var req service.PostTransactionDebitRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.Logger.Warn("failed to read request.body for debit transaction", "error", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	transaction, err := h.transactionService.Debit(r.Context(), req)
 	if err != nil {
+		utils.Logger.Error("failed to process debit transaction", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -62,12 +67,14 @@ func (h *TransactionHandler) TransferTransaction(w http.ResponseWriter, r *http.
 	var req service.PostTransactionTransferRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.Logger.Warn("failed to read request.body for transfer transaction", "error", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	result, err := h.transactionService.Transfer(r.Context(), req)
 	if err != nil {
+		utils.Logger.Error("failed to process transfer transaction", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -96,6 +103,7 @@ func (h *TransactionHandler) TransactionHistory(w http.ResponseWriter, r *http.R
 	if offsetStr != "" {
 		offset, offsetConvertErr = strconv.Atoi(offsetStr)
 		if offsetConvertErr != nil {
+			utils.Logger.Warn("invalid 'offset' query parameter", "value", offsetStr, "error", offsetConvertErr)
 			http.Error(w, fmt.Sprintf("%s is not a Number", offsetStr), http.StatusBadRequest)
 			return
 		}
@@ -105,6 +113,7 @@ func (h *TransactionHandler) TransactionHistory(w http.ResponseWriter, r *http.R
 	if limitStr != "" {
 		limit, limitConvertErr = strconv.Atoi(limitStr)
 		if limitConvertErr != nil {
+			utils.Logger.Warn("invalid 'limit' query parameter", "value", limitStr, "error", limitConvertErr)
 			http.Error(w, fmt.Sprintf("%s is not a Number", limitStr), http.StatusBadRequest)
 			return
 		}
@@ -118,6 +127,7 @@ func (h *TransactionHandler) TransactionHistory(w http.ResponseWriter, r *http.R
 
 	history, err := h.transactionService.GetHistory(r.Context(), req)
 	if err != nil {
+		utils.Logger.Error("failed to get transaction history", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -132,6 +142,7 @@ func (h *TransactionHandler) GetTransactionByID(w http.ResponseWriter, r *http.R
 
 	transactionID := chi.URLParam(r, "id")
 	if transactionID == "" {
+		utils.Logger.Warn("transaction ID is missing from URL parameters")
 		http.Error(w, "Transaction ID is required", http.StatusBadRequest)
 		return
 	}
@@ -139,6 +150,7 @@ func (h *TransactionHandler) GetTransactionByID(w http.ResponseWriter, r *http.R
 
 	transaction, err := h.transactionService.GetByID(r.Context(), req)
 	if err != nil {
+		utils.Logger.Error("failed to get transaction by id", "transaction_id", transactionID, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

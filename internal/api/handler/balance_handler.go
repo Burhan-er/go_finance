@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"go_finance/internal/service"
+	"go_finance/pkg/utils"
 	"net/http"
 	"time"
 )
@@ -20,6 +21,7 @@ func (h *BalanceHandler) GetCurrentBalance(w http.ResponseWriter, r *http.Reques
 	req.UserID = r.URL.Query().Get("user_id")
 	balance, err := h.balanceService.GetCurrent(r.Context(), req)
 	if err != nil {
+		utils.Logger.Error("failed to fetch balance", "error",err,"userID", req.UserID)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

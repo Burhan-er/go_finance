@@ -9,7 +9,7 @@ import (
 	"go_finance/internal/repository/postgres"
 	"go_finance/internal/service"
 	"go_finance/pkg/database"
-	"log"
+	"go_finance/pkg/utils"
 	"net/http"
 	"os"
 	"os/signal"
@@ -20,26 +20,32 @@ import (
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("Could not load config: %v", err)
+		utils.Logger.Error("Could not load config", "error", err)
+		os.Exit(1)
 	}
 
-	log.Println("Logger initialized")
+	utils.InitLogger()
+	utils.Logger.Info("Logger initialized")
 
-	db, err := database.ConnectDB(cfg.DatabaseURL)
+	db, err := database.ConnectAndMigrateDB(cfg.DatabaseURL, "migrations")
 	if err != nil {
-		log.Fatalf("Could not connect to database: %v", err)
+		utils.Logger.Error("Migration failed", "error", err)
+		os.Exit(1)
 	}
 	defer db.Close()
-	log.Println("Database connection established")
+	utils.Logger.Info("Database connection established")
 
 	//Repo And Services
+	auditLogRepo := postgres.NewAuditLogRepository(db)
+	auditLogService := service.NewAuditLogService(auditLogRepo)
+
 	userRepo := postgres.NewUserRepository(db)
 	balanceRepo := postgres.NewBalanceRepository(db)
 	transactionRepo := postgres.NewTransactionRepository(db)
 
-	balanceService := service.NewBalanceService(balanceRepo)
-	userService := service.NewUserService(userRepo, balanceRepo,cfg.JWTSecret, cfg.JWTExpiresIn)
-	transactionService := service.NewTransactionService(transactionRepo, balanceRepo, db)
+	userService := service.NewUserService(userRepo, balanceRepo, cfg.JWTSecret, cfg.JWTExpiresIn, auditLogService)
+	balanceService := service.NewBalanceService(balanceRepo, auditLogService)
+	transactionService := service.NewTransactionService(transactionRepo, balanceRepo, db, auditLogService)
 
 	//Handler
 	userHandler := handler.NewUserHandler(userService)
@@ -65,23 +71,25 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("Server starting on %s\n", server.Addr)
+		utils.Logger.Info("Server starting", "addr", server.Addr)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Could not listen on %s: %v\n", server.Addr, err)
+			utils.Logger.Error("Could not listen", "addr", server.Addr, "error", err)
+			os.Exit(1)
 		}
 	}()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("Shutting down server...")
+	utils.Logger.Info("Shutting down server...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
+		utils.Logger.Error("Server forced to shutdown", "error", err)
+		os.Exit(1)
 	}
 
-	log.Println("Server exiting")
+	utils.Logger.Info("Server exiting")
 }

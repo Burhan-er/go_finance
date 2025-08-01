@@ -15,8 +15,8 @@ CREATE TABLE transactions (
     from_user_id UUID NOT NULL,
     to_user_id UUID NOT NULL,
     amount NUMERIC(15, 2) NOT NULL CHECK (amount > 0),
-    type VARCHAR(50) NOT NULL, -- e.g., 'transfer', 'deposit', 'withdrawal'
-    status VARCHAR(50) NOT NULL DEFAULT 'pending', -- e.g., 'pending', 'completed', 'failed'
+    type VARCHAR(50) NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'pending',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (from_user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (to_user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -32,9 +32,9 @@ CREATE TABLE balances (
 CREATE TABLE audit_log   (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     entity_type VARCHAR(50) NOT NULL,
-    entity_id UUID, -- NULL olabilir eğer tüm sistemle ilgili bir log ise
+    entity_id UUID, 
     action VARCHAR(50) NOT NULL,
-    details JSONB, -- JSON formatında detaylı bilgi saklamak için
+    details VARCHAR(200),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

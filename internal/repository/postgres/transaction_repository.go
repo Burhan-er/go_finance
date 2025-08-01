@@ -16,17 +16,28 @@ func NewTransactionRepository(db *sql.DB) *transactionRepository {
 	return &transactionRepository{db: db}
 }
 
-func (r *transactionRepository) CreateTransaction(ctx context.Context, tx *sql.Tx, transaction *domain.Transaction) error {
-	query := `INSERT INTO transactions (from_user_id, to_user_id, type, status, amount, created_at)
-			  VALUES ($1, $2, $3, $4, $5, $6)`
+func (r *transactionRepository) CreateTransaction(ctx context.Context, tx *sql.Tx, transaction *domain.Transaction) (string, error) {
+	query := `INSERT INTO transactions (from_user_id, to_user_id, type, status, amount, created_at, updated_at, description)
+			  VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`
 
 	transaction.CreatedAt = time.Now()
 	if transaction.Status == "" {
 		transaction.Status = domain.Pending
 	}
+	var insertedID string
 
-	_,err := tx.ExecContext(ctx, query, transaction.UserID, transaction.ToUserID, transaction.Type, transaction.Status, transaction.Amount, transaction.CreatedAt)
-	return err
+	err := tx.QueryRowContext(ctx, query,
+		transaction.UserID,
+		transaction.ToUserID,
+		transaction.Type,
+		transaction.Status,
+		transaction.Amount,
+		transaction.CreatedAt,
+		transaction.UpdatedAt,
+		transaction.Description, 
+	).Scan(&insertedID)
+
+	return insertedID, err
 }
 
 func (r *transactionRepository) GetTransactionsByUserID(ctx context.Context, id string, opts ...domain.TransactionQueryOption) ([]*domain.Transaction, error) {
@@ -49,7 +60,7 @@ func (r *transactionRepository) GetTransactionsByUserID(ctx context.Context, id 
 	query := `SELECT id, from_user_id, to_user_id, type, status, amount, created_at 
 	          FROM transactions WHERE from_user_id = $1`
 	args := []interface{}{id}
-	argIndex := 2 
+	argIndex := 2
 
 	if hasType {
 		query += fmt.Sprintf(" AND status = $%d", argIndex)
@@ -95,12 +106,12 @@ func (r *transactionRepository) GetTransactionsByUserID(ctx context.Context, id 
 	return transactions, nil
 }
 
-func (r *transactionRepository) GetTranscaptionByID(ctx context.Context,tx *sql.Tx, id string)(*domain.Transaction, error){
+func (r *transactionRepository) GetTranscaptionByID(ctx context.Context, id string) (*domain.Transaction, error) {
 	query := `SELECT id, from_user_id, to_user_id, type, status, amount, created_at
 	          FROM transactions WHERE id = $1`
 
 	var t domain.Transaction
-	err := tx.QueryRowContext(ctx, query, id).Scan(
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&t.ID,
 		&t.UserID,
 		&t.ToUserID,
@@ -116,7 +127,7 @@ func (r *transactionRepository) GetTranscaptionByID(ctx context.Context,tx *sql.
 	return &t, nil
 }
 
-func (r *transactionRepository) UpdateTransactionStatus(ctx context.Context, tx *sql.Tx, id string, status domain.StatusType) (error) {
+func (r *transactionRepository) UpdateTransactionStatus(ctx context.Context, tx *sql.Tx, id string, status domain.StatusType) error {
 	query := `UPDATE transactions SET status = $1 WHERE id = $2`
 	_, err := tx.ExecContext(ctx, query, status, id)
 	return err
