@@ -27,7 +27,7 @@ func main() {
 	utils.InitLogger()
 	utils.Logger.Info("Logger initialized")
 
-	db, err := database.ConnectAndMigrateDB(cfg.DatabaseURL, "migrations")
+	db, _, err := database.ConnectAndMigrateDB(cfg.DatabaseURL, "migrations")
 	if err != nil {
 		utils.Logger.Error("Migration failed", "error", err)
 		os.Exit(1)

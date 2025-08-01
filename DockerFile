@@ -8,8 +8,8 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o /go-finance ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -o /go-finance-app ./cmd/server
 
 EXPOSE 8080
 
-CMD ["/go-finance"]
+CMD ["/go-finance-app"]

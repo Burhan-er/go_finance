@@ -29,7 +29,7 @@ CREATE TABLE balances (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE TABLE audit_log   (
+CREATE TABLE audit_logs   (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     entity_type VARCHAR(50) NOT NULL,
     entity_id UUID, 

@@ -16,20 +16,22 @@ type Config struct {
 	JWTExpiresIn time.Duration
 }
 
-func Load()(*Config,error){
-		if err := godotenv.Load(); err != nil {
-			log.Println("Warning: .env file not found, reading from environment variables")
+func Load() (*Config, error) {
+	if os.Getenv("ENV") != "production" {
+		if err := godotenv.Load(".env"); err != nil {
+			log.Printf("Warning: .env file not found, reading from environment variables: %s\n", err.Error())
 		}
+	}
 
-	jwtExpiresIn, err := strconv.Atoi(getEnv("JWT_EXPIRES_IN_MINUTES","60"))
+	jwtExpiresIn, err := strconv.Atoi(getEnv("JWT_EXPIRES_IN_MINUTES", "60"))
 	if err != nil {
 		return nil, err
 	}
 
 	return &Config{
-		ServerAddr:   getEnv("SERVER_ADDR",":8080"),
-		DatabaseURL:  getEnv("DATABASE_URL",""),
-		JWTSecret:    getEnv("JWT_SECRET","defaultsecret"),
+		ServerAddr:   getEnv("SERVER_ADDR", ":8080"),
+		DatabaseURL:  getEnv("DATABASE_URL", ""),
+		JWTSecret:    getEnv("JWT_SECRET", "defaultsecret"),
 		JWTExpiresIn: time.Duration(jwtExpiresIn) * time.Minute,
 	}, nil
 
