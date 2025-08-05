@@ -48,7 +48,6 @@ func (s *transactionService) Credit(ctx context.Context, req PostTransactionCred
 		Type:        req.Type,
 		Amount:      req.Amount,
 		Status:      domain.Pending,
-		Description: req.Description,
 		CreatedAt:   time.Now(),
 	}
 
@@ -122,7 +121,6 @@ func (s *transactionService) Debit(ctx context.Context, req PostTransactionDebit
 		Type:        req.Type,
 		Amount:      req.Amount,
 		Status:      domain.Pending,
-		Description: req.Description,
 		CreatedAt:   time.Now(),
 	}
 
@@ -193,7 +191,6 @@ func (s *transactionService) Transfer(ctx context.Context, req PostTransactionTr
 		Type:        domain.Transfer,
 		Amount:      req.Amount,
 		Status:      domain.Pending,
-		Description: req.Description,
 		CreatedAt:   time.Now(),
 	}
 
