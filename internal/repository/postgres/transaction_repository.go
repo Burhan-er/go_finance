@@ -17,8 +17,8 @@ func NewTransactionRepository(db *sql.DB) *transactionRepository {
 }
 
 func (r *transactionRepository) CreateTransaction(ctx context.Context, tx *sql.Tx, transaction *domain.Transaction) (string, error) {
-	query := `INSERT INTO transactions (from_user_id, to_user_id, type, status, amount, created_at, description)
-			  VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`
+	query := `INSERT INTO transactions (from_user_id, to_user_id, type, status, amount, created_at)
+			  VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
 
 	transaction.CreatedAt = time.Now()
 	if transaction.Status == "" {
@@ -33,7 +33,6 @@ func (r *transactionRepository) CreateTransaction(ctx context.Context, tx *sql.T
 		transaction.Status,
 		transaction.Amount,
 		transaction.CreatedAt,
-		transaction.Description,
 	).Scan(&insertedID)
 
 	return insertedID, err

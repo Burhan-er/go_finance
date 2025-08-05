@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"go_finance/internal/api"
 	"go_finance/internal/api/handler"
 	"go_finance/internal/api/middleware"
@@ -26,8 +27,24 @@ func main() {
 
 	utils.InitLogger()
 	utils.Logger.Info("Logger initialized")
+	
+	//DB
+	maxRetries := 4
+	var (
+		db  *sql.DB
+	)
+	for i := 0; i < maxRetries; i++ {
 
-	db, _, err := database.ConnectAndMigrateDB(cfg.DatabaseURL, "migrations")
+		db, _, err = database.ConnectAndMigrateDB(cfg.DatabaseURL, "migrations")
+		if err == nil {
+			utils.Logger.Error("Migration failed", "error", err)
+			break	
+		}
+		utils.Logger.Error("Migration attempt failed", "attempt", i+1, "error", err)
+		if i<maxRetries-1{
+			time.Sleep(2*time.Second)
+		} 	
+	}
 	if err != nil {
 		utils.Logger.Error("Migration failed", "error", err)
 		os.Exit(1)
