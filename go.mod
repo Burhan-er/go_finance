@@ -11,3 +11,5 @@ require (
 	github.com/shopspring/decimal v1.4.0
 	golang.org/x/crypto v0.40.0
 )
+
+require github.com/go-chi/cors v1.2.2 // indirect

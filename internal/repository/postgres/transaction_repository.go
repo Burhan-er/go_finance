@@ -16,7 +16,7 @@ func NewTransactionRepository(db *sql.DB) *transactionRepository {
 	return &transactionRepository{db: db}
 }
 
-func (r *transactionRepository) CreateTransaction(ctx context.Context, tx *sql.Tx, transaction *domain.Transaction) (string, error) {
+func (r *transactionRepository) CreateTransaction(ctx context.Context, db *sql.DB, transaction *domain.Transaction) (string, error) {
 	query := `INSERT INTO transactions (from_user_id, to_user_id, type, status, amount, created_at)
 			  VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
 
@@ -26,7 +26,7 @@ func (r *transactionRepository) CreateTransaction(ctx context.Context, tx *sql.T
 	}
 	var insertedID string
 
-	err := tx.QueryRowContext(ctx, query,
+	err := db.QueryRowContext(ctx, query,
 		transaction.UserID,
 		transaction.ToUserID,
 		transaction.Type,
@@ -125,8 +125,19 @@ func (r *transactionRepository) GetTranscaptionByID(ctx context.Context, id stri
 	return &t, nil
 }
 
-func (r *transactionRepository) UpdateTransactionStatus(ctx context.Context, tx *sql.Tx, id string, status domain.StatusType) error {
-	query := `UPDATE transactions SET status = $1 WHERE id = $2`
-	_, err := tx.ExecContext(ctx, query, status, id)
-	return err
+func (r *transactionRepository) UpdateTransactionStatus(ctx context.Context, tx *sql.Tx, db *sql.DB, id string, status domain.StatusType) error {
+    query := `UPDATE transactions SET status = $1 WHERE id = $2`
+
+    if tx != nil {
+        _, err := tx.ExecContext(ctx, query, status, id)
+        return err
+    }
+
+    if db != nil {
+        _, err := db.ExecContext(ctx, query, status, id)
+        return err
+    }
+
+    return fmt.Errorf("neither tx nor db provided")
 }
+

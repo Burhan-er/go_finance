@@ -59,7 +59,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	var req service.RefreshRequest
-	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.Logger.Warn("failed to decode refresh request body", "error", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return

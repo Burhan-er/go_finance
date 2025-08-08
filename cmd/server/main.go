@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 )
@@ -53,6 +54,8 @@ func main() {
 	utils.Logger.Info("Database connection established")
 
 	//Repo And Services
+	numWorkers,_ := strconv.Atoi(cfg.NumWorkers)
+	jobQueueSize,_ := strconv.Atoi(cfg.JobQueueSize)
 	auditLogRepo := postgres.NewAuditLogRepository(db)
 	auditLogService := service.NewAuditLogService(auditLogRepo)
 
@@ -60,9 +63,20 @@ func main() {
 	balanceRepo := postgres.NewBalanceRepository(db)
 	transactionRepo := postgres.NewTransactionRepository(db)
 
+	transactionProcessor := service.NewTransactionProcessor(
+		numWorkers,
+		jobQueueSize,
+		transactionRepo,
+		balanceRepo,
+		db,
+		auditLogService,
+	)
+
 	userService := service.NewUserService(userRepo, balanceRepo, cfg.JWTSecret, cfg.JWTExpiresIn, auditLogService)
 	balanceService := service.NewBalanceService(balanceRepo, auditLogService)
-	transactionService := service.NewTransactionService(transactionRepo, balanceRepo, db, auditLogService)
+	transactionService := service.NewTransactionService(transactionRepo, balanceRepo, db, auditLogService,transactionProcessor)
+
+	transactionProcessor.Start(numWorkers)
 
 	//Handler
 	userHandler := handler.NewUserHandler(userService)
@@ -94,11 +108,13 @@ func main() {
 			os.Exit(1)
 		}
 	}()
-
+		//graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
+	transactionProcessor.Stop()
 	utils.Logger.Info("Shutting down server...")
+
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

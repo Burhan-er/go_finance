@@ -23,7 +23,7 @@ func NewTransactionHandler(ts service.TransactionService) *TransactionHandler {
 func (h *TransactionHandler) CreditTransaction(w http.ResponseWriter, r *http.Request) {
 
 	var req service.PostTransactionCreditRequest
-
+	
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.Logger.Warn("failed to read request.body for credit transaction", "error", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)

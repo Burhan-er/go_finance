@@ -9,11 +9,13 @@ import (
 	"go_finance/internal/domain"
 	"go_finance/internal/repository"
 	"go_finance/pkg/utils"
+	"sync"
 )
 
 type balanceService struct {
 	balanceRepo     repository.BalanceRepository
 	auditLogService AuditLogService
+	mu sync.RWMutex
 }
 
 func NewBalanceService(repo repository.BalanceRepository, auditLogService AuditLogService) BalanceService {
@@ -24,6 +26,8 @@ func NewBalanceService(repo repository.BalanceRepository, auditLogService AuditL
 }
 
 func (s *balanceService) GetCurrent(ctx context.Context, req GetBalanceCurrentRequest) (*GetBalanceCurrentResponse, error) {
+	s.mu.RLock()
+	defer s.mu.Unlock()
 	s.auditLogService.Create(ctx, "balance", req.UserID, "get_current_attempt", "Get current balance attempt")
 	if req.UserID == "" {
 		utils.Logger.Warn("User ID required for current balance retrieval")
@@ -57,6 +61,8 @@ func (s *balanceService) GetCurrent(ctx context.Context, req GetBalanceCurrentRe
 }
 
 func (s *balanceService) GetHistorical(ctx context.Context, req GetBalanceHistoricalRequest) (*GetBalanceHistoricalResponse, error) {
+	s.mu.RLock()
+	defer s.mu.Unlock()
 	s.auditLogService.Create(ctx, "balance", req.UserID, "get_historical_attempt", "Get historical balance attempt")
 	if req.UserID == "" {
 		utils.Logger.Warn("User ID required for historical balance retrieval")
@@ -84,6 +90,8 @@ func (s *balanceService) GetHistorical(ctx context.Context, req GetBalanceHistor
 }
 
 func (s *balanceService) GetAtTime(ctx context.Context, req GetBalanceAtTimeRequest) (*GetBalanceAtTimeResponse, error) {
+	s.mu.RLock()
+	defer s.mu.Unlock()
 	s.auditLogService.Create(ctx, "balance", "", "get_at_time_attempt", "Get balance at specific time attempt")
 
 	if req.UserID != ctx.Value(middleware.UserIDKey) && ctx.Value(middleware.UserRoleKey) != domain.AdminRole {
