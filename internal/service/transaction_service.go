@@ -171,7 +171,7 @@ func (s *transactionService) Transfer(ctx context.Context, req PostTransactionTr
 }
 
 func (s *transactionService) GetHistory(ctx context.Context, req GetTransactionHistoryRequest) (*GetTransactionHistoryResponse, error) {
-	if ctx.Value(middleware.UserIDKey) != req.UserID && ctx.Value(middleware.UserRoleKey) != domain.AdminRole {
+	if ctx.Value(middleware.UserIDKey) != req.UserID && ctx.Value(middleware.UserRoleKey) != string(domain.AdminRole) {
 		utils.Logger.Warn("Unauthorized access attempt for transaction history",
 			"requesting_user_id", ctx.Value(middleware.UserIDKey),
 			"target_user_id", *req.UserID,

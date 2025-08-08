@@ -30,7 +30,7 @@ func main() {
 	utils.Logger.Info("Logger initialized")
 	
 	//DB
-	maxRetries := 4
+	maxRetries := 3
 	var (
 		db  *sql.DB
 	)

@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type Handlers struct {
@@ -35,6 +36,11 @@ func NewRouter(authMiddleware *mWare.AuthMiddleware, h Handlers) http.Handler {
 		AllowCredentials: false,
 		MaxAge:           300,
 	}))
+
+	//promethesu
+	r.Use(mWare.PrometheusMetrics)
+
+	r.Handle("/metrics", promhttp.Handler())
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Route("/auth", func(r chi.Router) {
