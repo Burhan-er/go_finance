@@ -44,7 +44,7 @@ func (s *transactionService) Credit(ctx context.Context, req PostTransactionCred
 		ToUserID:  req.ToUserID,
 		Type:      domain.TransactionType(domain.Credit),
 		Amount:    req.Amount,
-		Status:    domain.Pending, 
+		Status:    domain.Pending,
 		CreatedAt: time.Now(),
 	}
 
@@ -214,7 +214,7 @@ func (s *transactionService) GetByID(ctx context.Context, req GetTransactionById
 		return nil, fmt.Errorf("failed to get transaction by ID: %w", err)
 	}
 
-	if ctx.Value(middleware.UserIDKey) != transaction.UserID && ctx.Value(middleware.UserRoleKey) != domain.AdminRole {
+	if ctx.Value(middleware.UserIDKey) != transaction.UserID && ctx.Value(middleware.UserRoleKey) != string(domain.AdminRole) {
 		utils.Logger.Warn("User dont have access for get transaction by id", "userID", ctx.Value(middleware.UserIDKey), "requestID", req.ID)
 		return nil, fmt.Errorf("user has not access to get transaction by ID: %s", req.ID)
 	}
