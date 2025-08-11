@@ -111,15 +111,15 @@ func (p *TransactionProcessor) processTransaction(ctx context.Context, job Job) 
 
 	switch job.Type {
 	case domain.TransactionType(domain.Credit):
-		senderAmount = decimal.Decimal{} //there are empty i expect be able to maybe bank account
+		senderAmount = decimal.Zero //there are empty i expect be able to maybe bank account
 		receiverAmount = job.Amount
 	case domain.TransactionType(domain.Debit):
 		senderAmount = job.Amount
-		receiverAmount = decimal.Decimal{} //""""
+		receiverAmount = decimal.Zero //""""
 	case domain.TransactionType(domain.Transfer):
 		senderAmount = job.Amount.Neg()
 		receiverAmount = job.Amount
-		
+
 	default:
 		utils.Logger.Error("Worker: unknown transaction type", "transaction_id", job.TransactionID, "type", job.Type)
 		p.updateTransactionStatus(job.TransactionID, domain.Failed, fmt.Sprintf("unknown transaction type: %s", job.Type))

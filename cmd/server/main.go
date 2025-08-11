@@ -9,6 +9,7 @@ import (
 	"go_finance/internal/config"
 	"go_finance/internal/repository/postgres"
 	"go_finance/internal/service"
+	"go_finance/pkg/cache"
 	"go_finance/pkg/database"
 	"go_finance/pkg/utils"
 	"net/http"
@@ -20,6 +21,7 @@ import (
 )
 
 func main() {
+	//CONFİG
 	cfg, err := config.Load()
 	if err != nil {
 		utils.Logger.Error("Could not load config", "error", err)
@@ -28,23 +30,23 @@ func main() {
 
 	utils.InitLogger()
 	utils.Logger.Info("Logger initialized")
-	
+
 	//DB
-	maxRetries := 3
+	maxRetries := 5
 	var (
-		db  *sql.DB
+		db *sql.DB
 	)
 	for i := 0; i < maxRetries; i++ {
 
 		db, _, err = database.ConnectAndMigrateDB(cfg.DatabaseURL, "migrations")
 		if err == nil {
 			utils.Logger.Error("Migration failed", "error", err)
-			break	
+			break
 		}
 		utils.Logger.Error("Migration attempt failed", "attempt", i+1, "error", err)
-		if i<maxRetries-1{
-			time.Sleep(2*time.Second)
-		} 	
+		if i < maxRetries-1 {
+			time.Sleep(2 * time.Second)
+		}
 	}
 	if err != nil {
 		utils.Logger.Error("Migration failed", "error", err)
@@ -53,9 +55,15 @@ func main() {
 	defer db.Close()
 	utils.Logger.Info("Database connection established")
 
+	cache := cache.NewCache()
+	cachePing, err := cache.Ping()
+	if err != nil {
+		utils.Logger.Error("Redis Failed", "error", err)
+	}
+	utils.Logger.Info("Redis Connection successfuly", "ping", cachePing)
 	//Repo And Services
-	numWorkers,_ := strconv.Atoi(cfg.NumWorkers)
-	jobQueueSize,_ := strconv.Atoi(cfg.JobQueueSize)
+	numWorkers, _ := strconv.Atoi(cfg.NumWorkers)
+	jobQueueSize, _ := strconv.Atoi(cfg.JobQueueSize)
 	auditLogRepo := postgres.NewAuditLogRepository(db)
 	auditLogService := service.NewAuditLogService(auditLogRepo)
 
@@ -73,8 +81,8 @@ func main() {
 	)
 
 	userService := service.NewUserService(userRepo, balanceRepo, cfg.JWTSecret, cfg.JWTExpiresIn, auditLogService)
-	balanceService := service.NewBalanceService(balanceRepo, auditLogService)
-	transactionService := service.NewTransactionService(transactionRepo, balanceRepo, db, auditLogService,transactionProcessor)
+	balanceService := service.NewBalanceService(balanceRepo, auditLogService, cache)
+	transactionService := service.NewTransactionService(transactionRepo, balanceRepo, db, auditLogService, transactionProcessor)
 
 	transactionProcessor.Start(numWorkers)
 
@@ -108,13 +116,12 @@ func main() {
 			os.Exit(1)
 		}
 	}()
-		//graceful shutdown
+	//graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	transactionProcessor.Stop()
 	utils.Logger.Info("Shutting down server...")
-
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
