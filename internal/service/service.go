@@ -8,6 +8,9 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token"`
+}
 type RegisterRequest struct {
 	Username string `json:"username"`
 	Email    string `json:"email"`
@@ -25,9 +28,10 @@ type LoginRequest struct {
 }
 
 type LoginResponse struct {
-	User        *domain.User `json:"user"`
-	AccessToken string       `json:"access_token"`
-	Message     string       `json:"message"`
+	User         *domain.User `json:"user"`
+	AccessToken  string       `json:"access_token"`
+	RefreshToken string       `json:"refresh_token"`
+	Message      string       `json:"message"`
 }
 type GetAllUsersRequest struct{}
 
@@ -120,9 +124,9 @@ type GetTransactionByIdResponse struct {
 }
 
 type GetBalanceHistoricalRequest struct {
-	UserID string `json:"user_id"`
-	StartDate   string`json:"start_date"`
-	EndDate string `json:"end_date"`
+	UserID    string `json:"user_id"`
+	StartDate string `json:"start_date"`
+	EndDate   string `json:"end_date"`
 }
 
 type GetBalanceHistoricalResponse struct {
@@ -138,7 +142,7 @@ type GetBalanceCurrentResponse struct {
 }
 
 type GetBalanceAtTimeRequest struct {
-	UserID string
+	UserID    string
 	Timestamp time.Time
 }
 
@@ -149,6 +153,7 @@ type GetBalanceAtTimeResponse struct {
 type UserService interface {
 	Register(ctx context.Context, req RegisterRequest) (*RegisterResponse, error)
 	Login(ctx context.Context, req LoginRequest) (*LoginResponse, error)
+	Refresh(ctx context.Context, refreshToken string) (*map[string]string, error)
 	GetAllUsers(ctx context.Context, req GetAllUsersRequest) (*GetAllUsersResponse, error)
 	GetUserByID(ctx context.Context, req *GetUserByIdRequest) (*GetUserByIdResponse, error)
 	UpdateUser(ctx context.Context, req PutUserByIdRequest) (*PutUserByIdResponse, error)

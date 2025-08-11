@@ -7,9 +7,38 @@ services:
       POSTGRES_USER: myuser
       POSTGRES_PASSWORD: mypassword
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/data
     ports:
       - "5432:5432"
+  redis:
+    image: redis:latest
+    restart: always
+    ports:
+      - '6379:6379'
+    volumes: 
+      - redis:/data
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    networks:
+      - monitoring
+    depends_on:
+      - prometheus
+
   app: 
     build:
       dockerfile: Dockerfile 
@@ -21,6 +50,13 @@ services:
       - "8080:8080" 
     depends_on:
       - db 
-
+      - redis
+      - prometheus
+      
+networks:
+  monitoring:
+    driver: bridge
+    
 volumes:
-  pgdata: 
+  pgdata:
+  redis: 

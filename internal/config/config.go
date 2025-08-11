@@ -14,6 +14,8 @@ type Config struct {
 	DatabaseURL  string
 	JWTSecret    string
 	JWTExpiresIn time.Duration
+	NumWorkers string
+	JobQueueSize string
 }
 
 func Load() (*Config, error) {
@@ -33,6 +35,8 @@ func Load() (*Config, error) {
 		DatabaseURL:  getEnv("DATABASE_URL", ""),
 		JWTSecret:    getEnv("JWT_SECRET", "defaultsecret"),
 		JWTExpiresIn: time.Duration(jwtExpiresIn) * time.Minute,
+		NumWorkers: getEnv("NUM_WORKERS","5"),
+		JobQueueSize: getEnv("JOB_QUEUE_SIZE","100"),
 	}, nil
 
 }

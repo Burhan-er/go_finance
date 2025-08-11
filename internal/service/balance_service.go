@@ -3,31 +3,50 @@ package service
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"go_finance/internal/api/middleware"
 	"go_finance/internal/domain"
 	"go_finance/internal/repository"
+	"go_finance/pkg/cache"
 	"go_finance/pkg/utils"
+	"time"
 )
 
 type balanceService struct {
 	balanceRepo     repository.BalanceRepository
 	auditLogService AuditLogService
+	cache           *cache.Cache
 }
 
-func NewBalanceService(repo repository.BalanceRepository, auditLogService AuditLogService) BalanceService {
+func NewBalanceService(repo repository.BalanceRepository, auditLogService AuditLogService, cache *cache.Cache) BalanceService {
 	return &balanceService{
 		balanceRepo:     repo,
 		auditLogService: auditLogService,
+		cache:           cache,
 	}
 }
 
 func (s *balanceService) GetCurrent(ctx context.Context, req GetBalanceCurrentRequest) (*GetBalanceCurrentResponse, error) {
+
 	s.auditLogService.Create(ctx, "balance", req.UserID, "get_current_attempt", "Get current balance attempt")
+
 	if req.UserID == "" {
 		utils.Logger.Warn("User ID required for current balance retrieval")
 		return nil, errors.New("user id required")
+	}
+	// CACHİNG
+	cacheKey := fmt.Sprintf("balance:%s", req.UserID)
+	val, err := s.cache.Get(ctx, cacheKey)
+	if err == nil {
+		var bal domain.Balance
+		if jsonErr := json.Unmarshal([]byte(val), &bal); jsonErr == nil {
+			return &GetBalanceCurrentResponse{
+				Balance: &bal,
+			}, nil
+		}
+
 	}
 
 	balance, err := s.balanceRepo.GetBalanceByUserID(ctx, req.UserID)
@@ -44,6 +63,10 @@ func (s *balanceService) GetCurrent(ctx context.Context, req GetBalanceCurrentRe
 
 	s.auditLogService.Create(ctx, "balance", req.UserID, "get_current_success", "Current balance retrieved successfully")
 	utils.Logger.Info("Current balance retrieved successfully", "userID", req.UserID)
+
+	if err := s.cache.Set(ctx, cacheKey, balance, time.Duration(10*time.Second)); err != nil {
+		utils.Logger.Error("GetCurrentBalanceOperation Cache Error", "userID", req.UserID)
+	}
 
 	response := &GetBalanceCurrentResponse{
 		Balance: &domain.Balance{

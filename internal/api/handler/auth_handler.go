@@ -56,3 +56,22 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(res)
 }
+
+func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
+	var req service.RefreshRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.Logger.Warn("failed to decode refresh request body", "error", err)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	newAccessToken, err := h.userService.Refresh(r.Context(), req.RefreshToken)
+
+	if err != nil {
+		utils.Logger.Warn("user refresh failed", "cookie", req.RefreshToken, "error", err)
+		http.Error(w, "invalid refreshOperation", http.StatusUnauthorized)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(newAccessToken)
+}

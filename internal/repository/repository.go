@@ -19,9 +19,9 @@ type UserRepository interface {
 }
 
 type TransactionRepository interface {
-	CreateTransaction(ctx context.Context, tx *sql.Tx, transaction *domain.Transaction) (string, error)
+	CreateTransaction(ctx context.Context, db *sql.DB, transaction *domain.Transaction) (string, error)
 	GetTransactionsByUserID(ctx context.Context, userID string, opts ...domain.TransactionQueryOption) ([]*domain.Transaction, error)
-	UpdateTransactionStatus(ctx context.Context, tx *sql.Tx, id string, status domain.StatusType) error
+	UpdateTransactionStatus(ctx context.Context,tx *sql.Tx, db *sql.DB, id string, status domain.StatusType) error
 	GetTranscaptionByID(ctx context.Context, id string) (*domain.Transaction, error)
 }
 

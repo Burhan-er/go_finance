@@ -8,6 +8,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type Handlers struct {
@@ -17,43 +19,58 @@ type Handlers struct {
 	Balance     *handler.BalanceHandler
 }
 
-func NewRouter(authMiddleware *mWare.AuthMiddleware,h Handlers) http.Handler {
+func NewRouter(authMiddleware *mWare.AuthMiddleware, h Handlers) http.Handler {
 	r := chi.NewRouter()
 
-	r.Use(middleware.Logger)    // Gelen istekleri loglar
-	r.Use(middleware.Recoverer) // Panic durumlarında sunucunun çökmesini engeller
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 
+	//CORS
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins: []string{"https://*", "http://*"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: false,
+		MaxAge:           300,
+	}))
+
+	//promethesu
+	r.Use(mWare.PrometheusMetrics)
+
+	r.Handle("/metrics", promhttp.Handler())
+
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Route("/auth", func(r chi.Router) {
-			r.Post("/register", h.Auth.Register) // PUT /api/v1/auth/register
-			r.Post("/login", h.Auth.Login)       // PUT /api/v1/auth/login
-
-			// r.Post("/refresh", authHandler.Refresh) // TODO: Implement refresh token logic
+			r.Post("/register", h.Auth.Register)
+			r.Post("/login", h.Auth.Login)
+			r.Post("/refresh", h.Auth.Refresh)
 		})
 
 		r.Route("/users", func(r chi.Router) {
 			r.Use(authMiddleware.RequireAuth)
-			r.Get("/", h.User.ListUsers)         // GET /api/v1/users
-			r.Get("/{id}", h.User.GetUserByID)   // GET /api/v1/users/{id}
-			r.Put("/{id}", h.User.UpdateUser)    // PUT /api/v1/users/{id}
-			r.Delete("/{id}", h.User.DeleteUser) // DELETE /api/v1/users/{id}
+			r.Get("/", h.User.ListUsers)
+			r.Get("/{id}", h.User.GetUserByID)
+			r.Put("/{id}", h.User.UpdateUser)
+			r.Delete("/{id}", h.User.DeleteUser)
 		})
 
 		r.Route("/transactions", func(r chi.Router) {
 			r.Use(authMiddleware.RequireAuth)
-			r.Post("/credit", h.Transaction.CreditTransaction)     // POST /api/v1/transactions/credit
-			r.Post("/debit", h.Transaction.DebitTransaction)       // POST /api/v1/transactions/debit
-			r.Post("/transfer", h.Transaction.TransferTransaction) // POST /api/v1/transactions/transfer
-			r.Get("/history", h.Transaction.TransactionHistory)    // GET /api/v1/transactions/history
-			r.Get("/{id}", h.Transaction.GetTransactionByID)       // GET /api/v1/transactions/{id}
+			r.Post("/credit", h.Transaction.CreditTransaction)
+			r.Post("/debit", h.Transaction.DebitTransaction)
+			r.Post("/transfer", h.Transaction.TransferTransaction)
+			r.Get("/history", h.Transaction.TransactionHistory)
+			r.Get("/{id}", h.Transaction.GetTransactionByID)
 		})
 
-		r.Route("/balances",func(r chi.Router) {
-			r.Get("/current", h.Balance.GetCurrentBalance)        // GET /api/v1/balances/current
-			r.Get("/historical", h.Balance.GetHistoricalBalances) // GET /api/v1/balances/historical
-			r.Get("/at-time", h.Balance.GetBalanceAtTime)         // GET /api/v1/balances/at-time
+		r.Route("/balances", func(r chi.Router) {
+			r.Use(authMiddleware.RequireAuth)
+			r.Get("/current", h.Balance.GetCurrentBalance)
+			r.Get("/historical", h.Balance.GetHistoricalBalances)
+			r.Get("/at-time", h.Balance.GetBalanceAtTime)
 		})
 	})
 

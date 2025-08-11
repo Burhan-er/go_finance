@@ -12,18 +12,20 @@ type Limit int
 type Offset int
 type StatusType string
 type TransactionType string
+type TransactionJobType string
 
-const (
-	Deposit    TransactionType = "deposit"
-	Withdrawal TransactionType = "withdrawal"
-	Transfer   TransactionType = "transfer"
-)
 
 const (
 	Pending   StatusType = "pending"
 	Completed StatusType = "completed"
 	Failed    StatusType = "failed"
 )
+const (
+	Credit TransactionJobType = "credit"
+	Debit TransactionJobType = "debit"
+	Transfer TransactionJobType = "transfer"
+)
+
 
 type Transaction struct {
 	ID          string          `json:"id"`
@@ -32,6 +34,5 @@ type Transaction struct {
 	Type        TransactionType `json:"type"`
 	Status      StatusType      `json:"status"`
 	Amount      decimal.Decimal `json:"amount"`
-	Description string          `json:"description"`
 	CreatedAt   time.Time       `json:"created_at"`
 }

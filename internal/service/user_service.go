@@ -37,6 +37,30 @@ func NewUserService(
 	}
 }
 
+func (s *userService) generateRefreshToken(user *domain.User) (string, error) {
+	claims := jwt.MapClaims{
+		"sub": user.ID,
+		"exp": time.Now().Add(4 * 24 * s.jwtExpiresIn).Unix(),
+		"iat": time.Now().Unix(),
+		"typ": "refresh",
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(s.jwtSecret))
+}
+
+func (s *userService) generateJWT(user *domain.User) (string, error) {
+	claims := jwt.MapClaims{
+		"sub":   user.ID,
+		"email": user.Email,
+		"role":  user.Role,
+		"exp":   time.Now().Add(s.jwtExpiresIn).Unix(),
+		"iat":   time.Now().Unix(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(s.jwtSecret))
+}
 func (s *userService) Register(ctx context.Context, req RegisterRequest) (*RegisterResponse, error) {
 	auditDetails := "User registration attempt: username=" + req.Username + ", email=" + req.Email
 	s.auditLogService.Create(ctx, "user", "", "register_attempt", auditDetails)
@@ -99,26 +123,55 @@ func (s *userService) Login(ctx context.Context, req LoginRequest) (*LoginRespon
 		s.auditLogService.Create(ctx, "user", user.ID, "login_failed", "JWT generation failed")
 		return nil, errors.New("could not process login")
 	}
+	refreshToken, err := s.generateRefreshToken(user)
+	if err != nil {
+		utils.Logger.Error("could not generate refresh", "error", err)
+		s.auditLogService.Create(ctx, "user", user.ID, "login_failed", "Refresh Failed")
+		return nil, errors.New("could not process login")
+	}
 	s.auditLogService.Create(ctx, "user", user.ID, "login_success", "User logged in successfully")
 
 	return &LoginResponse{
-		User:        user,
-		AccessToken: token,
-		Message:     "Login successful",
+		User:         user,
+		AccessToken:  token,
+		RefreshToken: refreshToken,
+		Message:      "Login successful",
 	}, nil
 }
-
-func (s *userService) generateJWT(user *domain.User) (string, error) {
-	claims := jwt.MapClaims{
-		"sub":   user.ID,
-		"email": user.Email,
-		"role":  user.Role,
-		"exp":   time.Now().Add(s.jwtExpiresIn).Unix(),
-		"iat":   time.Now().Unix(),
+func (s *userService) Refresh(ctx context.Context, refreshToken string) (*map[string]string, error) {
+	claims := jwt.MapClaims{}
+	token, err := jwt.ParseWithClaims(refreshToken, claims, func(token *jwt.Token) (interface{}, error) {
+		return []byte(s.jwtSecret), nil
+	})
+	if err != nil || !token.Valid {
+		return nil, errors.New("invalid refresh token")
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(s.jwtSecret))
+	exp, ok := claims["exp"].(float64)
+	if !ok || int64(exp) < time.Now().Unix() {
+		return nil, errors.New("refresh token expired")
+	}
+
+	userID, ok := claims["sub"].(string)
+	if !ok {
+		return nil, errors.New("invalid token payload")
+	}
+
+	user, err := s.userRepo.GetUserByID(ctx, userID)
+	if err != nil {
+		return nil, errors.New("user not found")
+	}
+
+	newAccessToken, err := s.generateJWT(user)
+	if err != nil {
+		return nil, errors.New("could not generate new access token")
+	}
+
+	response := map[string]string{
+		"access_token": newAccessToken,
+	}
+
+	return &response, nil
 }
 
 func (s *userService) GetUserByID(ctx context.Context, req *GetUserByIdRequest) (*GetUserByIdResponse, error) {

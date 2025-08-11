@@ -18,6 +18,7 @@ CREATE TABLE transactions (
     type VARCHAR(50) NOT NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'pending',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (from_user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (to_user_id) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -71,7 +72,15 @@ BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$ language plpgsql;
+
+CREATE OR REPLACE FUNCTION update_last_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.last_updated_at = NOW();
+    RETURN NEW;
+END;
+$$ language plpgsql;
 
 CREATE TRIGGER update_users_updated_at
 BEFORE UPDATE ON users
@@ -81,4 +90,17 @@ EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_balances_last_updated_at
 BEFORE UPDATE ON balances
 FOR EACH ROW
-EXECUTE FUNCTION update_updated_at_column();
+EXECUTE FUNCTION update_last_updated_at_column();
+
+INSERT INTO users (username, email, password_hash, role)
+VALUES 
+    ('user1', 'ahmet@example.com', '$2a$14$2E2JqjBF3MG5omtKKH1C5OP5crlkjfu2DkI9SHAOuozaT/AGZ6RWC', 'user'),
+    ('user2', 'tuncay@example.com', '$2a$14$lSgFh/GeTSOrAinC5y6E4elS9N98zKLRcXfigbo4MH1I622ts/iy2', 'user'),
+    ('admin', 'admin@example.com', '$2a$14$2i/8ilIoeLLE/ron26DQZOQm5CU9YHMAD8pMcDbSsc7bdWhJuwpAq', 'admin');
+
+INSERT INTO balances (user_id, amount)
+SELECT id, 1000.00 FROM users WHERE username = 'user1';
+INSERT INTO balances (user_id, amount)
+SELECT id, 500.00 FROM users WHERE username = 'user2';
+INSERT INTO balances (user_id, amount)
+SELECT id, 999999.99 FROM users WHERE username = 'admin';
