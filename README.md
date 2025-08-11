@@ -1,9 +1,6 @@
 # go_finance
 Insider şirketi bünyesinde, Go (Golang) programlama dili kullanılarak geliştirilecek bir finans uygulamasıdır.
 
-Tamam, tek bir tam **README.md** dosyasını sana burada veriyorum.
-İngilizce, lisans kısmı yok, verdiğin tüm servis bilgileri ve endpointler dahil:
-
 ---
 
 ````markdown
