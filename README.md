@@ -12,7 +12,7 @@ This project is developed within Insider using the Go (Golang) programming langu
    ```bash
    git clone https://github.com/username/go-finance.git
    cd go-finance
-````
+   ```
 
 2. **Start all services using Docker Compose:**
 
