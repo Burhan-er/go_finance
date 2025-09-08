@@ -10,7 +10,7 @@ This project is developed within Insider using the Go (Golang) programming langu
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/burhan-er/go-finance.git
+   git clone https://github.com/burhan-er/go_finance.git
    cd go-finance
    ```
 
